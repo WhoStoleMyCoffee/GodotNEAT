@@ -8,9 +8,20 @@
 
 config_version=4
 
+_global_script_classes=[ {
+"base": "Reference",
+"class": "NEATNN",
+"language": "GDScript",
+"path": "res://NEAT/NEATGenome.gd"
+} ]
+_global_script_class_icons={
+"NEATNN": ""
+}
+
 [application]
 
 config/name="NEAT_v2"
+run/main_scene="res://Scenes/TestScene.tscn"
 config/icon="res://icon.png"
 
 [physics]
