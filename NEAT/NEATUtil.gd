@@ -9,68 +9,35 @@ extends Node
 #	(genes are automatically sorted when adding a connection. to manually sort, call NEAT::sort_connections())
 #oh boy i cant wait for lambdas.
 func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
-	var offspring : NEATNN = NEATNN.new(p1.INPUT_COUNT, p1.OUTPUT_COUNT)
-	var biggest_node_id : int = 0
+	var offspring : NEATNN = NEATNN.new(0,0)
+	offspring.copy(p1)
 	
-	#loop both parents' genes
-	var i1 : int = 0
-	var i2 : int = 0
-	var p1_genes_size : int = p1.connections.size()
-	var p2_genes_size : int = p2.connections.size()
-	while (i1 < p1_genes_size) or (i2 < p2_genes_size):
+	var p1genes : Array = p1.connections
+	var p2genes : Array = p2.connections
+	for i in range(p2genes.size()):
+		var c2 : Dictionary = p2genes[i] # <- connection/gene
 		
-#		EXCESS GENES (skip the rest of the worse parent)
-		if i1 == p1_genes_size:
+		#EXCESS GENES (skip the rest of the worse parent)
+		if c2.i > p1genes[-1].i:
 			break
 		
-		var chosengene : Dictionary
-		
-		#P1 "EXCESS", just add the rest of p1
-		if i2 == p2_genes_size:
-			chosengene = p1.connections[i1].duplicate()
-			#ADD GENE TO OFFSPRING
-			if !offspring.has_connection(chosengene.i):
-				offspring.add_connection(chosengene)
-				biggest_node_id = max(biggest_node_id, max(chosengene.in, chosengene.out))
-			i1 += 1
+		var co = offspring.get_connection(c2.i)
+		#DISJOINT GENES
+		if co == null:
+			offspring.add_connection(c2)
 			continue
 		
-		var c1 : Dictionary = p1.connections[i1]
-		var c2 : Dictionary = p2.connections[i2]
+		#MATCHING GENES
+		if randf() < 0.5:
+			#set weight to p2's weight
+			co.w = c2.w
 		
-#		MATCHING GENES
-		if c1.i == c2.i:
-			#choose gene randomly from parents
-			chosengene = c2.duplicate() if randf() < 0.5 else c1.duplicate()
-			
-			#if one gene is disabled, the corresponding gene in the offspring will likely be disabled
-			if !c1.e or !c2.e:
-				if randf() < 0.75:
-					chosengene.e = false
-			
-			i1 += 1
-			i2 += 1
+		#if one gene is disabled, the corresponding gene in the offspring will likely be disabled
+		if !c2.e and randf() < 0.75:
+			co.e = false
 		
-#		DISJOINT GENES
-		else:
-			#choose gene from smallest innov
-			chosengene = c1.duplicate() if c1.i < c2.i else c2.duplicate()
-			#increment the smaller one
-			i1 += int(c1.i < c2.i)
-			i2 += int(c2.i < c1.i)
-		
-#		ADD GENE TO OFFSPRING
-		if !offspring.has_connection(chosengene.i):
-			offspring.add_connection(chosengene)
-			biggest_node_id = max(biggest_node_id, max(chosengene.in, chosengene.out))
 	
-	#add new hidden nodes
-	# biggest_node_id is essentially the index of the last hidden node.
-	#  So, we just need to have that many nodes in total in the end
-	#  Input and output nodes have already been added on  offspring::_init()
-	for _i in range(biggest_node_id - p1.INPUT_COUNT+1-p1.OUTPUT_COUNT):
-		offspring.nodes.append(0.0)
-	
+	offspring.nodes.resize( max(p1.nodes.size(), p2.nodes.size()) )
 	return offspring
 
 
@@ -121,11 +88,7 @@ func calc_distance(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEI
 	
 	
 	#calc avg weight difference of matching genes
-	W /= max(float(matching_genes_count), 0.0)
+	W /= max(float(matching_genes_count), 1.0)
 	
 	return (EXCESS_WEIGHT * E / N) + (DISJOINT_WEIGHT * D / N) + (WEIGHT_WEIGHT * W)
 
-
-#returns whether 2 genomes are compatible (ie same species)
-func is_compatible(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEIGHT : float, WEIGHT_WEIGHT : float, threshold : int) -> bool:
-	return calc_distance(n1, n2, EXCESS_WEIGHT, DISJOINT_WEIGHT, WEIGHT_WEIGHT)<threshold

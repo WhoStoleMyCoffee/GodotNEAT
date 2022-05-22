@@ -51,12 +51,9 @@ func feed_forward(X : Array) -> Array:
 
 
 func add_connection(c : Dictionary) -> void:
-	#find place for connection from the back bc its more likely to be a the end
-	for i in range(connections.size(), 0, -1):
-		if connections[i-1].i < c.i:
-			connections.insert(i, c)
-			return
-	connections.push_front(c)
+	nodes.resize(max(nodes.size(), max(c.in, c.out)+1))
+	var i : int = connections.bsearch_custom(c.i, self, "_compare_connections", true)
+	connections.insert(i, c)
 
 
 func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
@@ -86,6 +83,7 @@ func set_connection_enabled(i : int, v : bool):
 
 func print_data():
 	print(self, ' ----------')
+	print('%s nodes' % nodes.size())
 	print('CONNECTIONS:')
 	for c in connections:
 		var s : String = '(%s) [%s -> %s]' % [c.i, c.in, c.out]
@@ -96,18 +94,16 @@ func print_data():
 		print(s)
 
 
-func get_connection_by_innov(innov : int):
-	for c in connections:
-		if c.i == innov:
-			return c
-	return null
+func _compare_connections(a, b) -> bool:
+	return a.i < b
 
+func get_connection(innov : int):
+	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
+	return connections[i] if i < connections.size() and connections[i].i == innov else null
 
 func has_connection(innov : int) -> bool:
-	for c in connections:
-		if c.i == innov:
-			return true
-	return false
+	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
+	return i < connections.size()
 
 
 func get_biggest_innov() -> int:
@@ -118,8 +114,12 @@ func get_biggest_innov() -> int:
 
 
 func copy(nn):
-	nodes = nn.nodes.duplicate()
-	connections = nn.connections.duplicate()
+	INPUT_COUNT = nn.INPUT_COUNT
+	OUTPUT_COUNT = nn.OUTPUT_COUNT
+	
+	nodes.empty()
+	nodes.resize(nn.nodes.size())
+	connections = nn.connections.duplicate(true)
 	fitness = nn.fitness
 	species_id = nn.species_id
 	return self
@@ -132,6 +132,9 @@ func sort_connections():
 func _connection_sort_func(a, b):
 	return a.i < b.i
 """
+
+func get_color() -> Color:
+	return owner.get_species_color(species_id) if owner else Color.white
 
 
 
@@ -184,4 +187,3 @@ func mutate_add_node():
 func mutate_enabled(enable : bool):
 	if connections.empty(): return
 	connections[randi() % connections.size()].is_enabled = enable
-
