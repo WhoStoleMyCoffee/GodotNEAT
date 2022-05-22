@@ -12,10 +12,16 @@ _global_script_classes=[ {
 "base": "Reference",
 "class": "NEATNN",
 "language": "GDScript",
-"path": "res://NEAT/NEATGenome.gd"
+"path": "res://NEAT/NEATNN.gd"
+}, {
+"base": "Reference",
+"class": "NEATPopulation",
+"language": "GDScript",
+"path": "res://NEAT/NEATPopulation.gd"
 } ]
 _global_script_class_icons={
-"NEATNN": ""
+"NEATNN": "",
+"NEATPopulation": ""
 }
 
 [application]

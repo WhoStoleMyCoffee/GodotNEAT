@@ -5,6 +5,8 @@ var connections : Array = [] #Dict[]
 var nodes : PoolRealArray = PoolRealArray()
 
 var fitness : float = 0.0
+var species_id : int = 0
+var owner : NEATPopulation
 
 var INPUT_COUNT : int
 var OUTPUT_COUNT : int
@@ -59,8 +61,7 @@ func add_connection(c : Dictionary) -> void:
 
 func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
 	return {
-#		'i' : population.get_connection_innov(_in, _out) if population else connections.size(),
-		'i' : connections.size(),
+		'i' : owner.get_connection_innov(_in, _out) if owner else connections.size(),
 		'in' : _in,
 		'out' : _out,
 		'w' : _w,
@@ -120,10 +121,10 @@ func copy(nn):
 	nodes = nn.nodes.duplicate()
 	connections = nn.connections.duplicate()
 	fitness = nn.fitness
-#	species_id = nn.species_id
+	species_id = nn.species_id
 	return self
 
-"""
+""" Unused?
 func sort_connections():
 	connections.sort_custom(self, '_connection_sort_func')
 
