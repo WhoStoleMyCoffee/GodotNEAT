@@ -6,7 +6,7 @@ var nodes : PoolRealArray = PoolRealArray()
 
 var fitness : float = 0.0
 var species_id : int = 0
-var owner : NEATPopulation
+var owner #: NEATPopulation #CYCLIC DEPENDENCIES AAAAAAAAH JUAN PLS FIX
 
 var INPUT_COUNT : int
 var OUTPUT_COUNT : int
@@ -52,7 +52,7 @@ func feed_forward(X : Array) -> Array:
 
 func add_connection(c : Dictionary) -> void:
 	#find place for connection from the back bc its more likely to be a the end
-	for i in range(connections.size()-1, 0, -1):
+	for i in range(connections.size(), 0, -1):
 		if connections[i-1].i < c.i:
 			connections.insert(i, c)
 			return
@@ -184,3 +184,4 @@ func mutate_add_node():
 func mutate_enabled(enable : bool):
 	if connections.empty(): return
 	connections[randi() % connections.size()].is_enabled = enable
+

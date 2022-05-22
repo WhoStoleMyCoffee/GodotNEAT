@@ -6,6 +6,9 @@ var genomes : Array = [] #NEATNN[]
 var species_counter : int = 0
 var gen : int = 0
 
+var NN_INPUTS : int
+var NN_OUTPUTS : int
+
 var compatibility_threshold : int = 4
 
 var connections_innovs : Dictionary = {} ##Dict<int[2], int>	{ [in0, out0] : innov0, ...}
@@ -52,14 +55,17 @@ signal gen_over
 
 
 func _init(_size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
+	NN_INPUTS = nn_inputs
+	NN_OUTPUTS = nn_outputs
+	
 	size = _size
 	genomes.resize(size)
 	for i in range(size):
-		genomes[i] = NEATNN.new(nn_inputs, nn_outputs)
+		genomes[i] = NEATNN.new(NN_INPUTS, NN_OUTPUTS)
 		genomes[i].owner = self
+		
+		#TODO init_permutations
 #	speciate()
-
-
 
 
 
@@ -81,3 +87,13 @@ func get_species_color(sid : int) -> Color:
 		fposmod(sid*0.37 + 0.2, 1.0),
 		fposmod(sid*0.216 + 0.7, 1.0)
 	)
+
+
+func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
+	return {
+		'i' : get_connection_innov(_in, _out),
+		'in' : _in,
+		'out' : _out,
+		'w' : _w,
+		'e' : _enabled
+	}
