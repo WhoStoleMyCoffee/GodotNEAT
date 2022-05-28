@@ -11,8 +11,12 @@ var di : int = 0
 
 
 func _ready():
-	pop = NEATPopulation.new(10, 10, 3,1)
+	pop = NEATPopulation.new(10, 100, 3,1)
 	$NEATDisplayer.set_drawing_nn(pop.genomes[0])
+	
+	print(pop.species_data)
+	for g in pop.genomes:
+		print(g.species_id)
 
 
 func _input(event):

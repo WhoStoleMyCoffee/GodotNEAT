@@ -1,9 +1,8 @@
 class_name NEATPopulation extends Reference
 
 
-var size : int = 0
 var genomes : Array = [] #NEATNN[]
-var species_len : Dictionary = {} #Dict<int id, int count> how many members each species has
+var species_data : Dictionary = {} #Dict<int id, Dict data>
 var species_counter : int = 0
 var gen : int = 0
 
@@ -52,11 +51,10 @@ var SPECIATION_MAX_STALENESS : int = 20
 signal gen_over
 
 
-func _init(_size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
+func _init(size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
 	NN_INPUTS = nn_inputs
 	NN_OUTPUTS = nn_outputs
 	
-	size = _size
 	genomes.resize(size)
 	for i in range(size):
 		genomes[i] = NEATNN.new(NN_INPUTS, NN_OUTPUTS)
@@ -65,7 +63,7 @@ func _init(_size : int, init_permutations : int, nn_inputs : int, nn_outputs : i
 		for _j in range(init_permutations):
 			mutate(genomes[i])
 	
-	species_len[0] = size
+	create_species(size)
 	compatibility_threshold *= 1 / float(TARGET_SPECIES)
 	speciate()
 
@@ -101,13 +99,30 @@ func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Di
 	}
 
 
+func create_species(length : int) -> Dictionary:
+	var s : Dictionary = {
+		'len' : length, #how many memeber there are
+		's' : 0, #staleness
+		'best' : 0.0 #best fitness ever
+	}
+	species_data[species_counter] = s
+	species_counter += 1
+	
+	return s
+
+
 func speciate():
 	var new_genomes : Array = [] #new speciated population
 	
 	while !genomes.empty():
 		var sid : int = genomes[0].species_id
-		var specimen : NEATNN = genomes[randi() % species_len[sid]]
-		species_len[sid] = 1
+		if sid == -1: #if new species (aka "hmm not sure")
+			sid = species_counter
+			genomes[0].species_id = sid
+			create_species(1)
+		
+		var specimen : NEATNN = genomes[randi() % species_data[sid].len]
+		species_data[sid].len = 1
 		
 		#foreach un-speciated genome (backwards)
 		for i in range(genomes.size()-1, -1, -1):
@@ -116,17 +131,23 @@ func speciate():
 			
 			#if compatible
 			if is_compatible(specimen, g):
-				species_len[sid] += 1
-				g.species_id = specimen.species_id
-				new_genomes.append(g)
+				species_data[sid].len += 1
+				
+				if g.species_id != specimen.species_id:
+					if species_data.has(g.species_id):
+						species_data[g.species_id] -= 1
+					g.species_id = specimen.species_id
+				
 				genomes.remove(i) #TODO swap with last genome before removing bc performance is ouchie
+				new_genomes.append(g)
 				continue
 			
 			#if same species but not compatible
 			if g.species_id == specimen.species_id:
-				g.species_id += 1
-				if !species_len.has(g.species_id):
-					species_len[g.species_id] = 1
+				#set species_id to "hmm not sure" and move it to the end
+				g.species_id = -1
+				genomes.remove(i)
+				genomes.append(g)
 		
 		new_genomes.append(specimen)
 		genomes.erase(specimen)
@@ -135,12 +156,18 @@ func speciate():
 	
 	
 	#remove empty species
-	for k in species_len.keys():
-		if species_len[k] <= 0:
-			species_len.erase(k)
+	for k in species_data.keys():
+		if species_data[k].len <= 0:
+			species_data.erase(k)
 	
 	#adjust compatibility threshold
-	compatibility_threshold *= species_len.size() / float(TARGET_SPECIES)
+	compatibility_threshold *= species_data.size() / float(TARGET_SPECIES)
+
+
+func reproduce():
+	var avg_global_adj_fitness : float = 0.0
+	
+	avg_global_adj_fitness /= float(genomes.size())
 
 
 #returns whether 2 genomes are compatible (ie same species)
