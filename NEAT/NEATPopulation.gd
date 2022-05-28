@@ -68,9 +68,6 @@ func _init(_size : int, init_permutations : int, nn_inputs : int, nn_outputs : i
 	species_len[0] = size
 	compatibility_threshold *= 1 / float(TARGET_SPECIES)
 	speciate()
-	
-	for g in genomes:
-		print(g.species_id)
 
 
 
@@ -94,11 +91,11 @@ func get_species_color(sid : int) -> Color:
 	)
 
 
+#unused?
 func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
 	return {
 		'i' : get_connection_innov(_in, _out),
-		'in' : _in,
-		'out' : _out,
+		'n' : PoolIntArray([_in, _out]),
 		'w' : _w,
 		'e' : _enabled
 	}

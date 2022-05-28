@@ -12,7 +12,6 @@ var di : int = 0
 
 func _ready():
 	pop = NEATPopulation.new(10, 10, 3,1)
-	
 	$NEATDisplayer.set_drawing_nn(pop.genomes[0])
 
 

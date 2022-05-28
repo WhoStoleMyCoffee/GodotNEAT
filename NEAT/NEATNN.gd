@@ -32,14 +32,14 @@ func feed_forward(X : Array) -> Array:
 		
 		#recurrent connections
 		for c in connections:
-			if c.out != i or !c.e: continue
-			x += nodes[c.in]*c.w
+			if c.n[1] != i or !c.e: continue
+			x += nodes[c.n[0]]*c.w
 		nodes[i] = activation_func(x) #TODO this needs to be activated, right????
 	
 	#the rest
 	for c in connections:
-		if is_node_input(c.out) or !c.e: continue #skip if recurrent (or not enabled)
-		new_nodes[c.out] += nodes[c.in]*c.w
+		if is_node_input(c.n[1]) or !c.e: continue #skip if recurrent (or not enabled)
+		new_nodes[c.n[1]] += nodes[c.n[0]]*c.w
 	
 	#activate and apply
 	for i in range(nodes.size()):
@@ -51,7 +51,7 @@ func feed_forward(X : Array) -> Array:
 
 
 func add_connection(c : Dictionary) -> void:
-	nodes.resize(max(nodes.size(), max(c.in, c.out)+1))
+	nodes.resize(max(nodes.size(), max(c.n[0], c.n[1])+1))
 	var i : int = connections.bsearch_custom(c.i, self, "_compare_connections", true)
 	connections.insert(i, c)
 
@@ -59,8 +59,7 @@ func add_connection(c : Dictionary) -> void:
 func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
 	return {
 		'i' : owner.get_connection_innov(_in, _out) if owner else connections.size(),
-		'in' : _in,
-		'out' : _out,
+		'n' : PoolIntArray([_in, _out]),
 		'w' : _w,
 		'e' : _enabled
 	}
@@ -86,7 +85,7 @@ func print_data():
 	print('%s nodes' % nodes.size())
 	print('CONNECTIONS:')
 	for c in connections:
-		var s : String = '(%s) [%s -> %s]' % [c.i, c.in, c.out]
+		var s : String = '(%s) [%s -> %s]' % [c.i, c.n[0], c.n[1]]
 		
 		if !c.e:
 			s += ' DISABLED'
@@ -155,7 +154,7 @@ func mutate_add_connection(allow_recurrent : bool):
 	
 	#if connection already exists, skip
 	for c in connections:
-		if (c.in==in_node and c.out==out_node) or (c.out==in_node and c.in==out_node): return
+		if (c.n[0]==in_node and c.n[1]==out_node) or (c.n[1]==in_node and c.n[0]==out_node): return
 	
 	#add connection
 	add_connection( create_connection(in_node, out_node, 0.0, true) )
@@ -179,9 +178,9 @@ func mutate_add_node():
 	#disable [in_node -> out_node]
 	bridge_con.e = false
 	#add [in_node -> next_node]
-	add_connection(create_connection(bridge_con.in, next_node_id, 1.0, true))
+	add_connection(create_connection(bridge_con.n[0], next_node_id, 1.0, true))
 	#add [next_node -> out_node]
-	add_connection(create_connection(next_node_id, bridge_con.out, bridge_con.w, true))
+	add_connection(create_connection(next_node_id, bridge_con.n[1], bridge_con.w, true))
 
 
 func mutate_enabled(enable : bool):

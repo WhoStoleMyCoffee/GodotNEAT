@@ -42,11 +42,11 @@ func _draw():
 		#skip disabled
 		if !c.e: continue
 		
-		var in_pos : Vector2 = node_positions_cache[c.in]
-		var out_pos : Vector2 = node_positions_cache[c.out]
+		var in_pos : Vector2 = node_positions_cache[c.n[0]]
+		var out_pos : Vector2 = node_positions_cache[c.n[1]]
 		
 		var col = connection_negative_color if c.w < 0 else connection_positive_color
-		if NN.is_node_input(c.out): #recurrent connection
+		if NN.is_node_input(c.n[1]): #recurrent connection
 			col = recurrent_connection_color
 		
 		draw_line(in_pos, out_pos, col, max(connection_width*abs(c.w), 1.0))
@@ -96,9 +96,9 @@ func cache_node_positions():
 				var nidx : int
 				
 				#check incoming connections
-				if c.out == i:	nidx = c.in
+				if c.n[1] == i:	nidx = c.n[0]
 				#check outgoing connections
-				elif c.in == i:	nidx = c.out
+				elif c.n[0] == i:	nidx = c.n[1]
 				#connection has nothing to do with this node so skip it
 				else: continue
 				
