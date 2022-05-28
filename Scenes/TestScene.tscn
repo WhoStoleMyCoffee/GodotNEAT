@@ -11,22 +11,71 @@ var di : int = 0
 
 
 func _ready():
-	pop = NEATPopulation.new(10, 100, 3,1)
+	pop = NEATPopulation.new()
+	pop.TARGET_SPECIES = 2
+	pop.MUTATION_ADD_NODE_CHANCE = 0.0
+	pop.init(10, 50, 3,1)
+	
+	ff()
 	$NEATDisplayer.set_drawing_nn(pop.genomes[0])
 	
+	print(pop.genomes.size())
 	print(pop.species_data)
-	for g in pop.genomes:
-		print(g.species_id)
 
 
 func _input(event):
 	if Input.is_action_just_pressed(\"ui_right\"):
 		di = (di+1) % pop.genomes.size()
-		$NEATDisplayer.set_drawing_nn(pop.genomes[di])
-		
+		update_display()
+	
 	if Input.is_action_just_pressed(\"ui_left\"):
-		di = (di-1) % pop.genomes.size()
+		di -= 1
+		if di < 0: di = pop.genomes.size()-1
+		update_display()
+	
+	if Input.is_action_just_pressed(\"ui_accept\"):
+		di = 0
+		print('  reproducing...')
+		pop.reproduce()
+		
+		print(pop.species_data)
+		ff()
+		update_display()
+
+
+func update_display():
 		$NEATDisplayer.set_drawing_nn(pop.genomes[di])
+		$RichTextLabel.text = 'genome %s\\n species: %s\\n fitness: %s' % [di, pop.genomes[di].species_id, pop.genomes[di].fitness]
+
+
+func ff():
+	for j in range(pop.genomes.size()):
+		var g = pop.genomes[j]
+		g.fitness = 0.0
+		for i in range(4):
+			var X : Array = [
+				[0.0, 0.0, 1.0],
+				[1.0, 0.0, 1.0],
+				[0.0, 1.0, 1.0],
+				[1.0, 1.0, 1.0]
+			][i]
+			var y : Array = g.feed_forward(X)
+			var expected : float = float(X[0]==1 or X[1]==1)
+			
+			var f : float = range_lerp(abs(y[0] - expected), 0.0, 1.0, 1.0, 0.0)
+			g.fitness += f
+			if j == 0:
+				print('%s f=%s fitness=%s' % [g, f, g.fitness])
+
+
+func _on_Button_pressed():
+	var X = [float($in1.pressed), float($in2.pressed), 1.0]
+	var y = pop.genomes[di].feed_forward(X)
+	$output.text = 'output: %s' % y[0]
+
+	var e : float = float(X[0]==1 or X[1]==1)
+	print('y=%s expected=%s f=%s' % [y[0], e, range_lerp(abs(y[0] - e), 0.0, 1.0, 1.0, 0.0)])
+
 
 #	var pop : NEATPopulation = NEATPopulation.new(2, 0, 3,1)
 #	var nn1 : NEATNN = pop.genomes[0]
@@ -73,3 +122,39 @@ rect_min_size = Vector2( 512, 256 )
 script = ExtResource( 1 )
 connection_width = 1.0
 do_draw_node_id = true
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+margin_left = 21.0
+margin_top = 294.0
+margin_right = 523.0
+margin_bottom = 540.0
+
+[node name="in1" type="CheckButton" parent="."]
+margin_left = 617.0
+margin_top = 24.0
+margin_right = 693.0
+margin_bottom = 64.0
+focus_mode = 0
+
+[node name="in2" type="CheckButton" parent="."]
+margin_left = 693.0
+margin_top = 24.0
+margin_right = 769.0
+margin_bottom = 64.0
+focus_mode = 0
+
+[node name="Button" type="Button" parent="."]
+margin_left = 630.0
+margin_top = 68.0
+margin_right = 687.0
+margin_bottom = 88.0
+focus_mode = 0
+text = "test nn"
+
+[node name="output" type="Label" parent="."]
+margin_left = 628.0
+margin_top = 104.0
+margin_right = 668.0
+margin_bottom = 118.0
+
+[connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]

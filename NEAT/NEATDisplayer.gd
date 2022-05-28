@@ -9,6 +9,7 @@ export(float) var node_radius = 8.0
 export(Color) var connection_positive_color = Color.blue
 export(Color) var connection_negative_color = Color.red
 export(float) var connection_width = 2.0
+export(float) var min_connection_width = 2.0
 export(Color) var recurrent_connection_color = Color.white
 export(bool) var do_draw_node_id = false
 export(Color) var font_color = Color.black
@@ -49,7 +50,7 @@ func _draw():
 		if NN.is_node_input(c.n[1]): #recurrent connection
 			col = recurrent_connection_color
 		
-		draw_line(in_pos, out_pos, col, max(connection_width*abs(c.w), 1.0))
+		draw_line(in_pos, out_pos, col, max(connection_width*abs(c.w), min_connection_width))
 	
 	
 #	DRAW NODES

@@ -116,7 +116,7 @@ func copy(nn):
 	INPUT_COUNT = nn.INPUT_COUNT
 	OUTPUT_COUNT = nn.OUTPUT_COUNT
 	
-	nodes.empty()
+	nodes.resize(0)
 	nodes.resize(nn.nodes.size())
 	connections = nn.connections.duplicate(true)
 	fitness = nn.fitness

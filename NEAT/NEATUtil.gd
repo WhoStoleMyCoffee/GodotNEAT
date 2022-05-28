@@ -18,7 +18,7 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 		var c2 : Dictionary = p2genes[i] # <- connection/gene
 		
 		#EXCESS GENES (skip the rest of the worse parent)
-		if c2.i > p1genes[-1].i:
+		if !p1genes.empty() and c2.i > p1genes[-1].i:
 			break
 		
 		var co = offspring.get_connection(c2.i)
@@ -38,6 +38,7 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 		
 	
 	offspring.nodes.resize( max(p1.nodes.size(), p2.nodes.size()) )
+	offspring.species_id = p1.species_id if p1.fitness > p2.fitness else p2.species_id
 	return offspring
 
 
@@ -92,3 +93,19 @@ func calc_distance(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEI
 	
 	return (EXCESS_WEIGHT * E / N) + (DISJOINT_WEIGHT * D / N) + (WEIGHT_WEIGHT * W)
 
+
+
+
+#pool : Dict<NEATNN genome, float weight>	with {'t' : float}
+#total : total of all weights
+func pick_from_pool(pool : Dictionary) -> NEATNN:
+	var total : float = pool.t
+	pool.erase('t')
+	var v : float = randf() * total
+	
+	for k in pool.keys():
+		if v <= pool[k]:
+			pool['t'] = total
+			return k
+		v -= pool[k]
+	return pool.keys()[1] #just in case

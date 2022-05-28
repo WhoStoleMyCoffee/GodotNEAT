@@ -9,7 +9,7 @@ var gen : int = 0
 var NN_INPUTS : int
 var NN_OUTPUTS : int
 
-var compatibility_threshold : int = 4
+var compatibility_threshold : float = 4
 
 var connections_innovs : Dictionary = {} ##Dict<int[2], int>	{ [in0, out0] : innov0, ...}
 
@@ -41,7 +41,7 @@ var SPECIATION_DISJOINT_WEIGHT : float = 1.0
 var SPECIATION_WEIGHT_WEIGHT : float = 0.4 #weight weight haha
 var TARGET_SPECIES : int = 4
 # % of genomes in each species that survive
-var SPECIATION_SURVIVAL_RATE : float = 0.2
+var SPECIATION_SURVIVAL_RATE : float = 0.4
 #var SPECIATION_INTERSPECIES_BREEDING_CHANCE = 0.001 #TODO
 #var SPECIATION_BEST_GENOME_BREEDING_CHANCE = 0.002 #TODO
 #how stale a species can be before it is "reset"
@@ -51,7 +51,7 @@ var SPECIATION_MAX_STALENESS : int = 20
 signal gen_over
 
 
-func _init(size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
+func init(size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
 	NN_INPUTS = nn_inputs
 	NN_OUTPUTS = nn_outputs
 	
@@ -102,13 +102,18 @@ func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Di
 func create_species(length : int) -> Dictionary:
 	var s : Dictionary = {
 		'len' : length, #how many memeber there are
-		's' : 0, #staleness
+		'age' : 0, #staleness
 		'best' : 0.0 #best fitness ever
 	}
 	species_data[species_counter] = s
 	species_counter += 1
 	
 	return s
+
+
+func reset_fitness():
+	for g in genomes:
+		g.fitness = 0.0
 
 
 func speciate():
@@ -135,7 +140,7 @@ func speciate():
 				
 				if g.species_id != specimen.species_id:
 					if species_data.has(g.species_id):
-						species_data[g.species_id] -= 1
+						species_data[g.species_id].len -= 1
 					g.species_id = specimen.species_id
 				
 				genomes.remove(i) #TODO swap with last genome before removing bc performance is ouchie
@@ -164,10 +169,77 @@ func speciate():
 	compatibility_threshold *= species_data.size() / float(TARGET_SPECIES)
 
 
+#TODO species aging (staleness) + remove stale species
 func reproduce():
 	var avg_global_adj_fitness : float = 0.0
+	#"Adjusted Fitness Sum" for each species
+	var afs : Dictionary = {} #Dict<int sid, float sum>
+	var pool : Dictionary = {} #Dict<int sid, Dict<NEATNN genome, float weight>>
+	
+	genomes.sort_custom(self, '_compare_genomes')
+	
+#	ADJUST FITNESS (& other stuff too)
+	for g in genomes:
+		#adjusted fitness shinanigans
+		var af : float = g.fitness / float(species_data[g.species_id].len) #genome's adjusted fitness
+		afs[g.species_id] = afs.get(g.species_id, 0.0) + af
+		avg_global_adj_fitness += af
+		
+		#while we're at it, create pool
+		if !pool.has(g.species_id):
+			pool[g.species_id] = { 't' : 0.0 } #t : total of all weights
+		if pool[g.species_id].size()-1 < ceil(species_data[g.species_id].len * SPECIATION_SURVIVAL_RATE):
+			pool[g.species_id][g] = g.fitness
+			pool[g.species_id].t += g.fitness
 	
 	avg_global_adj_fitness /= float(genomes.size())
+	genomes.clear()
+	
+	
+#	CREATE OFFSPRINGS
+	for sid in species_data.keys():
+		var best_boi : NEATNN = pool[sid].keys()[1]
+		if best_boi.fitness > species_data[sid].best:
+			species_data[sid].best = best_boi.fitness
+		else:
+			species_data[sid].age += 1
+			if species_data[sid].age > SPECIATION_MAX_STALENESS:
+				continue
+		
+		#	(avg_adjusted_fitness / avg_global_adjused_fitness) * N
+		#	( (afs[sid] / N)      / avg_global_adj_fitness ) * N
+		#Ns cancel out:		afs[sid] / avg_global_adj_fitness
+		var allowed_genomes : int = round(afs[sid] / avg_global_adj_fitness)
+		
+		reproduce_species(sid, allowed_genomes, pool)
+	
+	print('new population size: %s' % genomes.size())
+	speciate()
+
+
+#pool : pool of ALL species
+func reproduce_species(sid : int, count : int, pool : Dictionary):
+	print('    reproducing species. sid=%s count=%s' % [sid, count])
+	species_data[sid].len = 0
+	for _i in range(count):
+		var p1 : NEATNN = NeatUtil.pick_from_pool(pool[sid])
+		var p2 : NEATNN = NeatUtil.pick_from_pool(pool[sid])
+		
+		#TODO cross-species breeding
+		# ...
+		
+		var child : NEATNN = NeatUtil.crossover(p2, p1) if p2.fitness > p1.fitness else NeatUtil.crossover(p1, p2)
+		child.owner = self
+		mutate(child)
+		genomes.append(child)
+		species_data[sid].len += 1
+
+
+func _compare_genomes(a, b):
+	if a.species_id != b.species_id:
+		return a.species_id < b.species_id
+	return a.fitness > b.fitness
+	
 
 
 #returns whether 2 genomes are compatible (ie same species)
