@@ -48,7 +48,6 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 #	(genes are automatically sorted when adding a connection. to manually sort, call NEAT::sort_connections())
 # d = (c1*E)/N  +  (c2*D)/N  +  c3*W
 func calc_distance(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEIGHT : float, WEIGHT_WEIGHT : float) -> float:
-	var N : int = max(n1.nodes.size(), n2.nodes.size())
 	var E : int = 0
 	var D : int = 0
 	var W : float = 0.0
@@ -91,11 +90,13 @@ func calc_distance(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEI
 	#calc avg weight difference of matching genes
 	W /= max(float(matching_genes_count), 1.0)
 	
+	var N : int = max(n1.nodes.size(), n2.nodes.size())
 	return (EXCESS_WEIGHT * E / N) + (DISJOINT_WEIGHT * D / N) + (WEIGHT_WEIGHT * W)
 
 
 
 
+#hmm, currently re-doing neatpopulation::reproduce...
 #pool : Dict<NEATNN genome, float weight>	with {'t' : float}
 #total : total of all weights
 func pick_from_pool(pool : Dictionary) -> NEATNN:

@@ -43,7 +43,7 @@ var TARGET_SPECIES : int = 4
 # % of genomes in each species that survive
 var SPECIATION_SURVIVAL_RATE : float = 0.4
 #var SPECIATION_INTERSPECIES_BREEDING_CHANCE = 0.001 #TODO
-#var SPECIATION_BEST_GENOME_BREEDING_CHANCE = 0.002 #TODO
+#var ELITISM : bool = false #TODO
 #how stale a species can be before it is "reset"
 var SPECIATION_MAX_STALENESS : int = 20
 
@@ -65,7 +65,7 @@ func init(size : int, init_permutations : int, nn_inputs : int, nn_outputs : int
 	
 	create_species(size)
 	compatibility_threshold *= 1 / float(TARGET_SPECIES)
-	speciate()
+	speciate(genomes.duplicate())
 
 
 
@@ -116,22 +116,23 @@ func reset_fitness():
 		g.fitness = 0.0
 
 
-func speciate():
-	var new_genomes : Array = [] #new speciated population
+#unsp : unspeciated genomes array
+func speciate(unsp : Array):
+	genomes.clear()
 	
-	while !genomes.empty():
-		var sid : int = genomes[0].species_id
+	while !unsp.empty():
+		var sid : int = unsp[0].species_id
 		if sid == -1: #if new species (aka "hmm not sure")
 			sid = species_counter
-			genomes[0].species_id = sid
+			unsp[0].species_id = sid
 			create_species(1)
 		
-		var specimen : NEATNN = genomes[randi() % species_data[sid].len]
+		var specimen : NEATNN = unsp[randi() % species_data[sid].len]
 		species_data[sid].len = 1
 		
 		#foreach un-speciated genome (backwards)
-		for i in range(genomes.size()-1, -1, -1):
-			var g : NEATNN = genomes[i]
+		for i in range(unsp.size()-1, -1, -1):
+			var g : NEATNN = unsp[i]
 			if g == specimen: continue
 			
 			#if compatible
@@ -143,22 +144,18 @@ func speciate():
 						species_data[g.species_id].len -= 1
 					g.species_id = specimen.species_id
 				
-				genomes.remove(i) #TODO swap with last genome before removing bc performance is ouchie
-				new_genomes.append(g)
+				unsp.remove(i) #TODO swap with last genome before removing bc performance is ouchie
+				genomes.append(g)
 				continue
 			
 			#if same species but not compatible
 			if g.species_id == specimen.species_id:
 				#set species_id to "hmm not sure" and move it to the end
 				g.species_id = -1
-				genomes.remove(i)
-				genomes.append(g)
-		
-		new_genomes.append(specimen)
-		genomes.erase(specimen)
-	
-	genomes = new_genomes
-	
+				unsp.remove(i)
+				unsp.append(g)
+		genomes.append(specimen)
+		unsp.erase(specimen)
 	
 	#remove empty species
 	for k in species_data.keys():
@@ -169,61 +166,67 @@ func speciate():
 	compatibility_threshold *= species_data.size() / float(TARGET_SPECIES)
 
 
-#TODO species aging (staleness) + remove stale species
 func reproduce():
 	var avg_global_adj_fitness : float = 0.0
 	#"Adjusted Fitness Sum" for each species
 	var afs : Dictionary = {} #Dict<int sid, float sum>
-	var pool : Dictionary = {} #Dict<int sid, Dict<NEATNN genome, float weight>>
+	var pools : Dictionary = {}
 	
 	genomes.sort_custom(self, '_compare_genomes')
 	
-#	ADJUST FITNESS (& other stuff too)
+#	ADJUST FITNESS
 	for g in genomes:
-		#adjusted fitness shinanigans
-		var af : float = g.fitness / float(species_data[g.species_id].len) #genome's adjusted fitness
-		afs[g.species_id] = afs.get(g.species_id, 0.0) + af
+		var sid : int = g.species_id
+		var af : float = g.fitness / float(species_data[sid].len) #adjusted fitness
+		afs[sid] = afs.get(sid, 0.0) + af
 		avg_global_adj_fitness += af
 		
-		#while we're at it, create pool
-		if !pool.has(g.species_id):
-			pool[g.species_id] = { 't' : 0.0 } #t : total of all weights
-		if pool[g.species_id].size()-1 < ceil(species_data[g.species_id].len * SPECIATION_SURVIVAL_RATE):
-			pool[g.species_id][g] = g.fitness
-			pool[g.species_id].t += g.fitness
-	
+		#create pool while we're at it
+		if !pools.has(sid):
+			pools[sid] = MatingPool.new()
+		if pools[sid].data.size() < ceil(species_data[sid].len * SPECIATION_SURVIVAL_RATE):
+			pools[sid].add(g)
 	avg_global_adj_fitness /= float(genomes.size())
-	genomes.clear()
 	
 	
 #	CREATE OFFSPRINGS
+	var new_genomes : Array = []
+	var gi : int = 0
 	for sid in species_data.keys():
-		var best_boi : NEATNN = pool[sid].keys()[1]
-		if best_boi.fitness > species_data[sid].best:
-			species_data[sid].best = best_boi.fitness
+		var sd : Dictionary = species_data[sid]
+		var best_boi : NEATNN = genomes[gi] #invalid get index on base 'array'
+		
+		if best_boi.fitness > sd.best:
+			sd.best = best_boi.fitness
+			sd.age = 0
 		else:
-			species_data[sid].age += 1
-			if species_data[sid].age > SPECIATION_MAX_STALENESS:
+			sd.age += 1
+			print('species %s died of old age' % sid)
+			if sd.age > SPECIATION_MAX_STALENESS:
+				gi += sd.len
 				continue
 		
 		#	(avg_adjusted_fitness / avg_global_adjused_fitness) * N
 		#	( (afs[sid] / N)      / avg_global_adj_fitness ) * N
 		#Ns cancel out:		afs[sid] / avg_global_adj_fitness
 		var allowed_genomes : int = round(afs[sid] / avg_global_adj_fitness)
+		reproduce_species(sid, allowed_genomes, pools, new_genomes)
 		
-		reproduce_species(sid, allowed_genomes, pool)
+		gi += sd.len
 	
 	print('new population size: %s' % genomes.size())
-	speciate()
+	speciate(new_genomes)
 
 
 #pool : pool of ALL species
-func reproduce_species(sid : int, count : int, pool : Dictionary):
+func reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
 	print('    reproducing species. sid=%s count=%s' % [sid, count])
-	species_data[sid].len = 0
+	species_data[sid].len = count
+	var pool : MatingPool = pools[sid]
+	
 	for _i in range(count):
-		var p1 : NEATNN = NeatUtil.pick_from_pool(pool[sid])
-		var p2 : NEATNN = NeatUtil.pick_from_pool(pool[sid])
+		var p1 : NEATNN = pool.pick()
+		var p2 : NEATNN = pool.pick()
 		
 		#TODO cross-species breeding
 		# ...
@@ -231,8 +234,7 @@ func reproduce_species(sid : int, count : int, pool : Dictionary):
 		var child : NEATNN = NeatUtil.crossover(p2, p1) if p2.fitness > p1.fitness else NeatUtil.crossover(p1, p2)
 		child.owner = self
 		mutate(child)
-		genomes.append(child)
-		species_data[sid].len += 1
+		new_genomes.append(child)
 
 
 func _compare_genomes(a, b):
@@ -262,3 +264,21 @@ func mutate(nn : NEATNN):
 		nn.mutate_enabled(true)
 	if randf() < MUTATION_CONNECTION_DISABLE_CHANCE:
 		nn.mutate_enabled(false)
+
+
+
+class MatingPool:
+	var data : Dictionary = {}
+	var t : float = 0.0
+	
+	func add(k : NEATNN):
+		data[k] = k.fitness
+		t += k.fitness
+	
+	func pick() -> NEATNN:
+		var v : float = randf()*t
+		for k in data.keys():
+			if v <= data[k]:
+				return k
+			v -= data[k]
+		return data.keys()[0] #just in case
