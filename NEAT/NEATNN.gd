@@ -89,14 +89,15 @@ func copy(nn):
 	
 	nodes.resize(0)
 	nodes.resize(nn.nodes.size())
-	connections = nn.connections.duplicate()
+	connections = nn.connections.duplicate(true)
 	fitness = nn.fitness
 	species_id = nn.species_id
+	owner = nn.owner
 	return self
 
 
 func get_color() -> Color:
-	return owner.get_species_color(species_id) if owner else Color.white
+	return owner.get_species_color(species_id) if owner else Color.transparent
 
 
 func reset():
@@ -183,6 +184,27 @@ func mutate_enabled(enable : bool):
 	connections[randi() % connections.size()].is_enabled = enable
 
 
+# SAVE & LOAD -------------------------------------------------------------
+func save_json(path : String):
+	var f : File = File.new()
+	f.open(path, File.WRITE)
+	f.store_line(to_json(get_save_data()))
+	f.close()
+
+
+func get_save_data() -> Dictionary:
+	var data : Dictionary = {
+		'n' : [INPUT_COUNT, OUTPUT_COUNT, nodes.size()],
+		'c' : [],
+		'f' : fitness,
+		's' : species_id
+	}
+	
+	for c in connections:
+		data.c.append(NeatUtil.compress_connection(c))
+	
+	return data
+
 
 # UTIL --------------------------------------------------------------------
 func get_hidden_nodes_count() -> int:
@@ -212,7 +234,6 @@ func print_data():
 			s += ' DISABLED'
 		
 		print(s)
-
 
 
 func activation_func(x : float):

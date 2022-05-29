@@ -23,7 +23,7 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 		var co = offspring.get_connection(c2.i)
 		#DISJOINT GENES
 		if co == null:
-			offspring.add_connection(c2.duplicate())
+			offspring.add_connection(c2.duplicate(true))
 			continue
 		
 		#MATCHING GENES
@@ -109,3 +109,10 @@ func pick_from_pool(pool : Dictionary) -> NEATNN:
 			return k
 		v -= pool[k]
 	return pool.keys()[1] #just in case
+
+
+func compress_connection(c : Dictionary) -> Array:
+	var a : int = c.i * (int(c.e)-int(!c.e)) #c.i if enabled, -c.i if disabled
+	var b : int = c.n[0] << 16 | (c.n[1] & 0xFFFF)
+	var w : float = c.w
+	return [a, b, w]

@@ -33,7 +33,7 @@ _global_script_class_icons={
 [application]
 
 config/name="NEAT_v2"
-run/main_scene="res://Scenes/TestScene.tscn"
+run/main_scene="res://Scenes/Test/TestScene.tscn"
 config/icon="res://icon.png"
 
 [autoload]

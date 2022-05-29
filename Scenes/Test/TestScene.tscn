@@ -6,6 +6,8 @@
 script/source = "extends Node2D
 
 
+const SAVEPATH : String = 'res://Scenes/Test/nn.json'
+
 var pop : NEATPopulation
 var di : int = 0
 
@@ -25,8 +27,7 @@ var y : Array = [
 
 func _ready():
 	pop = NEATPopulation.new(20, 3,1)
-	pop.TARGET_SPECIES = 4
-	pop.MUTATION_ADD_NODE_CHANCE = 0.0
+	pop.TARGET_SPECIES = 6
 	
 	for g in pop.genomes:
 		pop.mutate(g.connect_all_nodes())
@@ -51,7 +52,7 @@ func _input(event):
 	if Input.is_action_just_pressed(\"ui_accept\"):
 		di = 0
 		print('  reproducing...')
-		pop.reproduce()
+		pop.gen_over()
 		
 		print(pop.species_data)
 		ff()
@@ -60,7 +61,8 @@ func _input(event):
 
 func update_display():
 		$NEATDisplayer.set_drawing_nn(pop.genomes[di])
-		$RichTextLabel.text = 'genome %s\\n species: %s\\n fitness: %s' % [di, pop.genomes[di].species_id, pop.genomes[di].fitness]
+		$RichTextLabel.text = 'GEN %s' % [pop.gen] \\
+			+ '\\n genome %s\\n  species: %s\\n  fitness: %s' % [di, pop.genomes[di].species_id, pop.genomes[di].fitness]
 
 
 func ff():
@@ -78,41 +80,17 @@ func _on_Button_pressed():
 	var y = pop.genomes[di].feed_forward(X)
 	$output.text = 'output: %s' % y[0]
 
-#	var e : float = float(X[0]==1 or X[1]==1)
-#	print('y=%s expected=%s f=%s' % [y[0], e, range_lerp(abs(y[0] - e), 0.0, 1.0, 1.0, 0.0)])
 
 
-#	var pop : NEATPopulation = NEATPopulation.new(2, 0, 3,1)
-#	var nn1 : NEATNN = pop.genomes[0]
-#	var nn2 : NEATNN = pop.genomes[1]
-#
-#	nn1.add_connection(pop.create_connection(0,3, 0, true))
-#	nn1.add_connection(pop.create_connection(1,3, 0, false))
-#	nn1.add_connection(pop.create_connection(2,3, 0, true))
-#	nn1.add_connection(pop.create_connection(1,4, 0, true))
-#	nn1.add_connection(pop.create_connection(4,3, 0, true))
-#
-#	nn2.add_connection(pop.create_connection(0,3, 0, true))
-#	nn2.add_connection(pop.create_connection(1,3, 0, false))
-#	nn2.add_connection(pop.create_connection(2,3, 0, true))
-#	nn2.add_connection(pop.create_connection(1,4, 0, true))
-#	nn2.add_connection(pop.create_connection(4,3, 0, false))
-#
-#	nn2.add_connection(pop.create_connection(4,5, 0, true))
-#	nn2.add_connection(pop.create_connection(5,3, 0, true))
-#
-#	nn1.add_connection(pop.create_connection(0,4, 0, true))
-#
-#	nn2.add_connection(pop.create_connection(2,4, 0, true))
-#	nn2.add_connection(pop.create_connection(0,5, 0, true))
-#
-#	nn1.print_data()
-#	nn2.print_data()
-#
-#
-#	var child : NEATNN = NeatUtil.crossover(nn2, nn1)
-#
-#	child.print_data()
+
+func _on_Save_pressed():
+	print('Saving genome...')
+	pop.genomes[di].save_json(SAVEPATH)
+	print('Saving complete')
+
+
+func _on_Load_pressed():
+	pass # Replace with function body.
 "
 
 [node name="TestScene" type="Node2D"]
@@ -162,4 +140,20 @@ margin_top = 104.0
 margin_right = 668.0
 margin_bottom = 118.0
 
+[node name="Save" type="Button" parent="."]
+margin_left = 542.0
+margin_top = 252.0
+margin_right = 667.0
+margin_bottom = 272.0
+text = "Save this genome"
+
+[node name="Load" type="Button" parent="."]
+margin_left = 542.0
+margin_top = 276.0
+margin_right = 667.0
+margin_bottom = 296.0
+text = "Load genome"
+
 [connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]
+[connection signal="pressed" from="Save" to="." method="_on_Save_pressed"]
+[connection signal="pressed" from="Load" to="." method="_on_Load_pressed"]

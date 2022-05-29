@@ -1,6 +1,7 @@
 class_name NEATPopulation extends Reference
 
 
+var base_size : int = 0
 var size : int = 0
 var genomes : Array = [] #NEATNN[]
 var species_data : Dictionary = {} #Dict<int id, Dict data>
@@ -55,6 +56,7 @@ signal gen_over
 func _init(s : int, nn_inputs : int, nn_outputs : int):
 	NN_INPUTS = nn_inputs
 	NN_OUTPUTS = nn_outputs
+	base_size = s
 	size = s
 	
 	for i in range(size):
@@ -115,9 +117,8 @@ func reset_fitness():
 
 
 #speciate the genomes array
-# mostly the same as	speciate(genomes.duplicate())
 func speciate_genomes():
-	speciate(genomes.duplicate())
+	speciate(genomes.duplicate(true))
 
 
 #arr : unspeciated genomes array
@@ -225,14 +226,19 @@ func reproduce():
 
 #pool : pool of ALL species
 func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
-	if count == 0: return
+	if count == 0:
+		if species_data.size() == 1: #if last species, reset
+			print('%s --- POPULATION FAILED. Resetting...' % [self])
+			reset( new_genomes, pools[sid].data.keys()[0] )
+		return
+
 #	print('    reproducing species. sid=%s count=%s' % [sid, count])
 	var pool : MatingPool = pools[sid]
 	
 	if DO_ELITISM:
 		#pool.data.keys()[0] = best genome in this species.
 		# its index 0 bc genomes have been sorted in reproduce()
-		new_genomes.append(pool.data.keys()[0])
+		new_genomes.append(NEATNN.new(NN_INPUTS, NN_OUTPUTS).copy(pool.data.keys()[0]))
 	
 	for _i in range(count - int(DO_ELITISM)):
 		var p1 : NEATNN = pool.pick()
@@ -247,6 +253,19 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 		child.owner = self
 		mutate(child)
 		new_genomes.append(child)
+
+
+func reset(arr : Array, base_nn : NEATNN):
+	arr.clear()
+	species_counter = 0
+	gen = 0
+	create_species(base_size)
+	for i in range(base_size):
+		var g : NEATNN = NEATNN.new(NN_INPUTS, NN_OUTPUTS).copy(base_nn)
+		mutate(g)
+		g.species_id = 0
+		g.owner = self
+		arr.append(g)
 
 
 func _compare_genomes(a, b):
@@ -277,6 +296,11 @@ func mutate(nn : NEATNN):
 	if randf() < MUTATION_CONNECTION_DISABLE_CHANCE:
 		nn.mutate_enabled(false)
 
+
+func gen_over():
+	gen += 1
+	emit_signal("gen_over")
+	reproduce()
 
 
 class MatingPool:
