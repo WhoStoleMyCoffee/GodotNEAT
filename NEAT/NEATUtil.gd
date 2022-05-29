@@ -118,10 +118,10 @@ func compress_connection(c : Dictionary) -> Array:
 	return [a, b, w]
 
 
-func uncompress_connection(c : Array) -> Dictionary:
+func uncompress_connection(a : int, b : int, c : float) -> Dictionary:
 	return {
-		'i' : abs(int(c[0])),
-		'n' : PoolIntArray([int(c[1]) >> 16, int(c[1]) & 0xFFFF]),
-		'w' : c[2],
-		'e' : (c[0] >= 0)
+		'i' : abs(a),
+		'n' : PoolIntArray([b >> 16, b & 0xFFFF]),
+		'w' : c,
+		'e' : (a >= 0)
 	}

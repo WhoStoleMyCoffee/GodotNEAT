@@ -195,34 +195,36 @@ func save_json(path : String):
 func load_json(path : String):
 	var f : File = File.new()
 	f.open(path, File.READ)
-	var d : Dictionary = parse_json(f.get_as_text())
+	var d : Array = parse_json(f.get_as_text())
 	f.close()
 	load_save_data(d)
 
 
-func get_save_data() -> Dictionary:
-	var data : Dictionary = {
-		'n' : [INPUT_COUNT, OUTPUT_COUNT, nodes.size()],
-		'c' : [],
-		'f' : fitness,
-		's' : species_id
-	}
+func get_save_data() -> Array:
+	var data : Array = [
+		INPUT_COUNT,
+		OUTPUT_COUNT,
+		nodes.size(),
+		fitness,
+		species_id
+	]
 	for c in connections:
-		data.c.append(NeatUtil.compress_connection(c))
+		data.append_array(NeatUtil.compress_connection(c))
 	
 	return data
 
 
-func load_save_data(d : Dictionary):
-	INPUT_COUNT = d.n[0]
-	OUTPUT_COUNT = d.n[1]
-	nodes.resize(d.n[2])
-	fitness = d.f
-	species_id = d.s
+func load_save_data(d : Array):
+	INPUT_COUNT = int(d[0])
+	OUTPUT_COUNT = int(d[1])
+	nodes.resize(int(d[2]))
+	fitness = d[3]
+	species_id = int(d[4])
 	
 	connections.clear()
-	for c in d.c:
-		connections.append(NeatUtil.uncompress_connection(c))
+	for i in range(5, d.size(), 3):
+		connections.append(NeatUtil.uncompress_connection(int(d[i]), int(d[i+1]), d[i+2]))
+
 
 
 # UTIL --------------------------------------------------------------------
