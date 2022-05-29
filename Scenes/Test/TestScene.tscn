@@ -90,7 +90,10 @@ func _on_Save_pressed():
 
 
 func _on_Load_pressed():
-	pass # Replace with function body.
+	print('Loading genome...')
+	pop.genomes[di].load_json(SAVEPATH)
+	print('Loading complete')
+	update_display()
 "
 
 [node name="TestScene" type="Node2D"]

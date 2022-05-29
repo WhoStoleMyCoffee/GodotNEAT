@@ -192,6 +192,14 @@ func save_json(path : String):
 	f.close()
 
 
+func load_json(path : String):
+	var f : File = File.new()
+	f.open(path, File.READ)
+	var d : Dictionary = parse_json(f.get_as_text())
+	f.close()
+	load_save_data(d)
+
+
 func get_save_data() -> Dictionary:
 	var data : Dictionary = {
 		'n' : [INPUT_COUNT, OUTPUT_COUNT, nodes.size()],
@@ -199,11 +207,22 @@ func get_save_data() -> Dictionary:
 		'f' : fitness,
 		's' : species_id
 	}
-	
 	for c in connections:
 		data.c.append(NeatUtil.compress_connection(c))
 	
 	return data
+
+
+func load_save_data(d : Dictionary):
+	INPUT_COUNT = d.n[0]
+	OUTPUT_COUNT = d.n[1]
+	nodes.resize(d.n[2])
+	fitness = d.f
+	species_id = d.s
+	
+	connections.clear()
+	for c in d.c:
+		connections.append(NeatUtil.uncompress_connection(c))
 
 
 # UTIL --------------------------------------------------------------------

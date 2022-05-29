@@ -113,6 +113,15 @@ func pick_from_pool(pool : Dictionary) -> NEATNN:
 
 func compress_connection(c : Dictionary) -> Array:
 	var a : int = c.i * (int(c.e)-int(!c.e)) #c.i if enabled, -c.i if disabled
-	var b : int = c.n[0] << 16 | (c.n[1] & 0xFFFF)
+	var b : int = ((c.n[0] & 0xFFFF) << 16) | (c.n[1] & 0xFFFF)
 	var w : float = c.w
 	return [a, b, w]
+
+
+func uncompress_connection(c : Array) -> Dictionary:
+	return {
+		'i' : abs(int(c[0])),
+		'n' : PoolIntArray([int(c[1]) >> 16, int(c[1]) & 0xFFFF]),
+		'w' : c[2],
+		'e' : (c[0] >= 0)
+	}
