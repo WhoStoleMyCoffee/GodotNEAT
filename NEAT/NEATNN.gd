@@ -16,7 +16,6 @@ var OUTPUT_COUNT : int
 func _init(input_count : int, output_count : int) -> void:
 	INPUT_COUNT = input_count
 	OUTPUT_COUNT = output_count
-	
 	nodes.resize(INPUT_COUNT + OUTPUT_COUNT)
 
 
@@ -28,20 +27,19 @@ func feed_forward(X : Array) -> Array:
 	
 	#set inputs
 	for i in range(INPUT_COUNT):
-		var x : float = float(X[i])
+		nodes[i] = float(X[i])
 		
 		#recurrent connections
 		for c in connections:
 			if c.n[1] != i or !c.e: continue
-			x += nodes[c.n[0]]*c.w
-		nodes[i] = activation_func(x) #TODO this needs to be activated, right????
+			nodes[i] += nodes[c.n[0]]*c.w
 	
-	#the rest
+	#rest of the connections
 	for c in connections:
 		if is_node_input(c.n[1]) or !c.e: continue #skip if recurrent (or not enabled)
 		new_nodes[c.n[1]] += nodes[c.n[0]]*c.w
 	
-	#activate and apply
+	#activate
 	for i in range(nodes.size()):
 		nodes[i] = activation_func( new_nodes[i] )
 		if is_node_output(i):
@@ -65,9 +63,6 @@ func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Di
 	}
 
 
-func activation_func(x : float):
-	return 1/(1+exp(-4*x))
-
 
 func is_node_input(i : int) -> bool:
 	return i<INPUT_COUNT
@@ -79,30 +74,6 @@ func is_node_output(i : int) -> bool:
 func set_connection_enabled(i : int, v : bool):
 	connections[i].e = v
 
-
-func print_data():
-	print(self, ' ----------')
-	print('%s nodes' % nodes.size())
-	print('CONNECTIONS:')
-	for c in connections:
-		var s : String = '(%s) [%s -> %s]' % [c.i, c.n[0], c.n[1]]
-		
-		if !c.e:
-			s += ' DISABLED'
-		
-		print(s)
-
-
-func _compare_connections(a, b) -> bool:
-	return a.i < b
-
-func get_connection(innov : int):
-	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
-	return connections[i] if i < connections.size() and connections[i].i == innov else null
-
-func has_connection(innov : int) -> bool:
-	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
-	return i < connections.size()
 
 
 func get_biggest_innov() -> int:
@@ -123,17 +94,41 @@ func copy(nn):
 	species_id = nn.species_id
 	return self
 
-""" Unused?
-func sort_connections():
-	connections.sort_custom(self, '_connection_sort_func')
-
-#oh boy i cant wait for lambdas
-func _connection_sort_func(a, b):
-	return a.i < b.i
-"""
 
 func get_color() -> Color:
 	return owner.get_species_color(species_id) if owner else Color.white
+
+
+func reset():
+	nodes.resize(0)
+	connections.clear()
+	fitness = 0.0
+	species_id = 0
+	return self
+
+
+#connect every input node with every hidden node (if any) and every hidden with every output
+func connect_all_nodes():
+	connections.clear()
+	var hidden_count = get_hidden_nodes_count()
+	
+	if hidden_count == 0:
+		for i in range(INPUT_COUNT):
+			for o in range(OUTPUT_COUNT):
+				add_connection(create_connection(i, INPUT_COUNT+o, 1, true))
+		return self
+		
+	for i in range(INPUT_COUNT):
+		for o in range(hidden_count):
+			add_connection(create_connection(i, INPUT_COUNT+OUTPUT_COUNT+o, 1, true))
+	for i in range(hidden_count):
+		for o in range(OUTPUT_COUNT):
+			add_connection(create_connection(INPUT_COUNT+OUTPUT_COUNT+i, INPUT_COUNT+o, 1, true))
+	return self
+
+
+func set_hidden_nodes_count(count : int):
+	nodes.resize(INPUT_COUNT + OUTPUT_COUNT + count)
 
 
 
@@ -186,3 +181,40 @@ func mutate_add_node():
 func mutate_enabled(enable : bool):
 	if connections.empty(): return
 	connections[randi() % connections.size()].is_enabled = enable
+
+
+
+# UTIL --------------------------------------------------------------------
+func get_hidden_nodes_count() -> int:
+	return nodes.size() - (INPUT_COUNT+OUTPUT_COUNT)
+
+
+func _compare_connections(a, b) -> bool:
+	return a.i < b
+
+func get_connection(innov : int):
+	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
+	return connections[i] if i < connections.size() and connections[i].i == innov else null
+
+func has_connection(innov : int) -> bool:
+	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
+	return i < connections.size()
+
+
+func print_data():
+	print(self, ' ----------')
+	print('%s nodes' % nodes.size())
+	print('CONNECTIONS:')
+	for c in connections:
+		var s : String = '(%s) [%s -> %s]' % [c.i, c.n[0], c.n[1]]
+		
+		if !c.e:
+			s += ' DISABLED'
+		
+		print(s)
+
+
+
+func activation_func(x : float):
+#	return 1/(1+exp(-4*x))
+	return tanh(x)*0.5 + 0.5

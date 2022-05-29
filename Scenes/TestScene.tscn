@@ -11,10 +11,12 @@ var di : int = 0
 
 
 func _ready():
-	pop = NEATPopulation.new()
-	pop.TARGET_SPECIES = 2
+	pop = NEATPopulation.new(20, 3,1)
+	pop.TARGET_SPECIES = 4
 	pop.MUTATION_ADD_NODE_CHANCE = 0.0
-	pop.init(10, 50, 3,1)
+	
+	for g in pop.genomes:
+		pop.mutate(g.connect_all_nodes())
 	
 	ff()
 	$NEATDisplayer.set_drawing_nn(pop.genomes[0])
@@ -49,8 +51,8 @@ func update_display():
 
 
 func ff():
-	for j in range(pop.genomes.size()):
-		var g = pop.genomes[j]
+	for j in range(pop.size()):
+		var g : NEATNN = pop.genomes[j]
 		g.fitness = 0.0
 		for i in range(4):
 			var X : Array = [
@@ -59,13 +61,16 @@ func ff():
 				[0.0, 1.0, 1.0],
 				[1.0, 1.0, 1.0]
 			][i]
-			var y : Array = g.feed_forward(X)
-			var expected : float = float(X[0]==1 or X[1]==1)
+			var y : Array = [
+				[0.0],
+				[1.0],
+				[1.0],
+				[1.0]
+			][i]
+			var output : Array = g.feed_forward(X)
 			
-			var f : float = range_lerp(abs(y[0] - expected), 0.0, 1.0, 1.0, 0.0)
+			var f : float = range_lerp(abs(output[0] - y[0]), 0.0, 1.0, 1.0, 0.0)
 			g.fitness += f
-			if j == 0:
-				print('%s f=%s fitness=%s' % [g, f, g.fitness])
 
 
 func _on_Button_pressed():
@@ -73,8 +78,8 @@ func _on_Button_pressed():
 	var y = pop.genomes[di].feed_forward(X)
 	$output.text = 'output: %s' % y[0]
 
-	var e : float = float(X[0]==1 or X[1]==1)
-	print('y=%s expected=%s f=%s' % [y[0], e, range_lerp(abs(y[0] - e), 0.0, 1.0, 1.0, 0.0)])
+#	var e : float = float(X[0]==1 or X[1]==1)
+#	print('y=%s expected=%s f=%s' % [y[0], e, range_lerp(abs(y[0] - e), 0.0, 1.0, 1.0, 0.0)])
 
 
 #	var pop : NEATPopulation = NEATPopulation.new(2, 0, 3,1)

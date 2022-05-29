@@ -9,8 +9,7 @@ extends Node
 #	(genes are automatically sorted when adding a connection. to manually sort, call NEAT::sort_connections())
 #oh boy i cant wait for lambdas.
 func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
-	var offspring : NEATNN = NEATNN.new(0,0)
-	offspring.copy(p1)
+	var offspring : NEATNN = NEATNN.new(0,0).copy(p1)
 	
 	var p1genes : Array = p1.connections
 	var p2genes : Array = p2.connections

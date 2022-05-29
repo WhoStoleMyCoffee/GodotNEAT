@@ -1,6 +1,7 @@
 class_name NEATPopulation extends Reference
 
 
+var size : int = 0
 var genomes : Array = [] #NEATNN[]
 var species_data : Dictionary = {} #Dict<int id, Dict data>
 var species_counter : int = 0
@@ -42,8 +43,8 @@ var SPECIATION_WEIGHT_WEIGHT : float = 0.4 #weight weight haha
 var TARGET_SPECIES : int = 4
 # % of genomes in each species that survive
 var SPECIATION_SURVIVAL_RATE : float = 0.4
-#var SPECIATION_INTERSPECIES_BREEDING_CHANCE = 0.001 #TODO
-#var ELITISM : bool = false #TODO
+var INTERSPECIES_BREEDING_CHANCE = 0.001
+var ELITISM : bool = false
 #how stale a species can be before it is "reset"
 var SPECIATION_MAX_STALENESS : int = 20
 
@@ -51,28 +52,25 @@ var SPECIATION_MAX_STALENESS : int = 20
 signal gen_over
 
 
-func init(size : int, init_permutations : int, nn_inputs : int, nn_outputs : int):
+func _init(s : int, nn_inputs : int, nn_outputs : int):
 	NN_INPUTS = nn_inputs
 	NN_OUTPUTS = nn_outputs
+	size = s
 	
-	genomes.resize(size)
 	for i in range(size):
-		genomes[i] = NEATNN.new(NN_INPUTS, NN_OUTPUTS)
+		genomes.append(NEATNN.new(NN_INPUTS, NN_OUTPUTS))
+		genomes[i].species_id = 0
 		genomes[i].owner = self
-		
-		for _j in range(init_permutations):
-			mutate(genomes[i])
 	
 	create_species(size)
 	compatibility_threshold *= 1 / float(TARGET_SPECIES)
-	speciate(genomes.duplicate())
 
 
 
 #get a connection's innovation id given its input and output nodes
 # if the connection isn't in the innov list (ie its new), then add it
 func get_connection_innov(in_node : int, out_node : int) -> int:
-	var c = [in_node, out_node]
+	var c = PoolIntArray([in_node, out_node])
 	var innov = connections_innovs.get(c, null)
 	if innov == null:
 		innov = connections_innovs.size()
@@ -116,23 +114,29 @@ func reset_fitness():
 		g.fitness = 0.0
 
 
-#unsp : unspeciated genomes array
-func speciate(unsp : Array):
+#speciate the genomes array
+# mostly the same as	speciate(genomes.duplicate())
+func speciate_genomes():
+	speciate(genomes.duplicate())
+
+
+#arr : unspeciated genomes array
+func speciate(arr : Array):
 	genomes.clear()
 	
-	while !unsp.empty():
-		var sid : int = unsp[0].species_id
+	while !arr.empty():
+		var sid : int = arr[0].species_id
 		if sid == -1: #if new species (aka "hmm not sure")
 			sid = species_counter
-			unsp[0].species_id = sid
+			arr[0].species_id = sid
 			create_species(1)
 		
-		var specimen : NEATNN = unsp[randi() % species_data[sid].len]
+		var specimen : NEATNN = arr[randi() % species_data[sid].len]
 		species_data[sid].len = 1
 		
 		#foreach un-speciated genome (backwards)
-		for i in range(unsp.size()-1, -1, -1):
-			var g : NEATNN = unsp[i]
+		for i in range(arr.size()-1, -1, -1):
+			var g : NEATNN = arr[i]
 			if g == specimen: continue
 			
 			#if compatible
@@ -144,7 +148,7 @@ func speciate(unsp : Array):
 						species_data[g.species_id].len -= 1
 					g.species_id = specimen.species_id
 				
-				unsp.remove(i) #TODO swap with last genome before removing bc performance is ouchie
+				arr.remove(i) #TODO swap with last genome before removing bc performance is ouchie
 				genomes.append(g)
 				continue
 			
@@ -152,10 +156,10 @@ func speciate(unsp : Array):
 			if g.species_id == specimen.species_id:
 				#set species_id to "hmm not sure" and move it to the end
 				g.species_id = -1
-				unsp.remove(i)
-				unsp.append(g)
+				arr.remove(i)
+				arr.append(g)
 		genomes.append(specimen)
-		unsp.erase(specimen)
+		arr.erase(specimen)
 	
 	#remove empty species
 	for k in species_data.keys():
@@ -174,7 +178,7 @@ func reproduce():
 	
 	genomes.sort_custom(self, '_compare_genomes')
 	
-#	ADJUST FITNESS
+	#ADJUST FITNESS
 	for g in genomes:
 		var sid : int = g.species_id
 		var af : float = g.fitness / float(species_data[sid].len) #adjusted fitness
@@ -186,10 +190,10 @@ func reproduce():
 			pools[sid] = MatingPool.new()
 		if pools[sid].data.size() < ceil(species_data[sid].len * SPECIATION_SURVIVAL_RATE):
 			pools[sid].add(g)
-	avg_global_adj_fitness /= float(genomes.size())
+	avg_global_adj_fitness /= float(size)
 	
 	
-#	CREATE OFFSPRINGS
+	#CREATE OFFSPRINGS
 	var new_genomes : Array = []
 	var gi : int = 0
 	for sid in species_data.keys():
@@ -201,8 +205,8 @@ func reproduce():
 			sd.age = 0
 		else:
 			sd.age += 1
-			print('species %s died of old age' % sid)
 			if sd.age > SPECIATION_MAX_STALENESS:
+				print('species %s died of old age' % sid, '. age=%s' % sd.age)
 				gi += sd.len
 				continue
 		
@@ -213,15 +217,16 @@ func reproduce():
 		reproduce_species(sid, allowed_genomes, pools, new_genomes)
 		
 		gi += sd.len
+		sd.len = allowed_genomes
 	
-	print('new population size: %s' % genomes.size())
+	size = new_genomes.size()
+	print('new population size: %s' % size)
 	speciate(new_genomes)
 
 
 #pool : pool of ALL species
 func reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
 	print('    reproducing species. sid=%s count=%s' % [sid, count])
-	species_data[sid].len = count
 	var pool : MatingPool = pools[sid]
 	
 	for _i in range(count):
@@ -282,3 +287,20 @@ class MatingPool:
 				return k
 			v -= data[k]
 		return data.keys()[0] #just in case
+
+
+
+# UTIL ----------------------------------------------------------------------
+func add_genome() -> NEATNN:
+	var g : NEATNN = NEATNN.new(NN_INPUTS, NN_OUTPUTS)
+	genomes.append(g)
+	g.species_id = 0 if genomes.empty() else genomes[0].species_id
+	g.owner = self
+	size += 1
+	return g
+
+func size() -> int:
+	return size
+
+func is_empty() -> bool:
+	return size==0
