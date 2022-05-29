@@ -9,6 +9,19 @@ script/source = "extends Node2D
 var pop : NEATPopulation
 var di : int = 0
 
+var X : Array = [
+	[0.0, 0.0, 1.0],
+	[1.0, 0.0, 1.0],
+	[0.0, 1.0, 1.0],
+	[1.0, 1.0, 1.0]
+]
+var y : Array = [
+	[0.0],
+	[1.0],
+	[1.0],
+	[1.0]
+]
+
 
 func _ready():
 	pop = NEATPopulation.new(20, 3,1)
@@ -55,21 +68,8 @@ func ff():
 		var g : NEATNN = pop.genomes[j]
 		g.fitness = 0.0
 		for i in range(4):
-			var X : Array = [
-				[0.0, 0.0, 1.0],
-				[1.0, 0.0, 1.0],
-				[0.0, 1.0, 1.0],
-				[1.0, 1.0, 1.0]
-			][i]
-			var y : Array = [
-				[0.0],
-				[1.0],
-				[1.0],
-				[1.0]
-			][i]
-			var output : Array = g.feed_forward(X)
-			
-			var f : float = range_lerp(abs(output[0] - y[0]), 0.0, 1.0, 1.0, 0.0)
+			var output : Array = g.feed_forward(X[i])
+			var f : float = range_lerp(abs(output[0] - y[i][0]), 0.0, 1.0, 1.0, 0.0)
 			g.fitness += f
 
 

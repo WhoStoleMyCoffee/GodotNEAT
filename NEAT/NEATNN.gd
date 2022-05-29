@@ -89,7 +89,7 @@ func copy(nn):
 	
 	nodes.resize(0)
 	nodes.resize(nn.nodes.size())
-	connections = nn.connections.duplicate(true)
+	connections = nn.connections.duplicate()
 	fitness = nn.fitness
 	species_id = nn.species_id
 	return self

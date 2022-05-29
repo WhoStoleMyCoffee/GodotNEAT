@@ -23,7 +23,7 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 		var co = offspring.get_connection(c2.i)
 		#DISJOINT GENES
 		if co == null:
-			offspring.add_connection(c2)
+			offspring.add_connection(c2.duplicate())
 			continue
 		
 		#MATCHING GENES

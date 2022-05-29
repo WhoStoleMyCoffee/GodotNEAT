@@ -44,7 +44,7 @@ var TARGET_SPECIES : int = 4
 # % of genomes in each species that survive
 var SPECIATION_SURVIVAL_RATE : float = 0.4
 var INTERSPECIES_BREEDING_CHANCE = 0.001
-var ELITISM : bool = false
+var DO_ELITISM : bool = true
 #how stale a species can be before it is "reset"
 var SPECIATION_MAX_STALENESS : int = 20
 
@@ -198,23 +198,22 @@ func reproduce():
 	var gi : int = 0
 	for sid in species_data.keys():
 		var sd : Dictionary = species_data[sid]
-		var best_boi : NEATNN = genomes[gi] #invalid get index on base 'array'
+		var best_boi : NEATNN = genomes[gi]
 		
 		if best_boi.fitness > sd.best:
 			sd.best = best_boi.fitness
 			sd.age = 0
 		else:
 			sd.age += 1
-			if sd.age > SPECIATION_MAX_STALENESS:
-				print('species %s died of old age' % sid, '. age=%s' % sd.age)
-				gi += sd.len
-				continue
 		
 		#	(avg_adjusted_fitness / avg_global_adjused_fitness) * N
 		#	( (afs[sid] / N)      / avg_global_adj_fitness ) * N
 		#Ns cancel out:		afs[sid] / avg_global_adj_fitness
 		var allowed_genomes : int = round(afs[sid] / avg_global_adj_fitness)
-		reproduce_species(sid, allowed_genomes, pools, new_genomes)
+		if sd.age > SPECIATION_MAX_STALENESS:
+			allowed_genomes = 0
+		
+		_reproduce_species(sid, allowed_genomes, pools, new_genomes)
 		
 		gi += sd.len
 		sd.len = allowed_genomes
@@ -225,16 +224,24 @@ func reproduce():
 
 
 #pool : pool of ALL species
-func reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
-	print('    reproducing species. sid=%s count=%s' % [sid, count])
+func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
+	if count == 0: return
+#	print('    reproducing species. sid=%s count=%s' % [sid, count])
 	var pool : MatingPool = pools[sid]
 	
-	for _i in range(count):
+	if DO_ELITISM:
+		#pool.data.keys()[0] = best genome in this species.
+		# its index 0 bc genomes have been sorted in reproduce()
+		new_genomes.append(pool.data.keys()[0])
+	
+	for _i in range(count - int(DO_ELITISM)):
 		var p1 : NEATNN = pool.pick()
 		var p2 : NEATNN = pool.pick()
 		
-		#TODO cross-species breeding
-		# ...
+		#CROSS SPECIES BREEDING
+		if randf() < INTERSPECIES_BREEDING_CHANCE:
+			var rsp : int = species_data.keys()[randi()%species_data.size()]
+			p2 = pools[ rsp ].pick()
 		
 		var child : NEATNN = NeatUtil.crossover(p2, p1) if p2.fitness > p1.fitness else NeatUtil.crossover(p1, p2)
 		child.owner = self
