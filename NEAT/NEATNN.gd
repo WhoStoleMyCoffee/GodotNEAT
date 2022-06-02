@@ -6,6 +6,7 @@ var nodes : PoolRealArray = PoolRealArray()
 
 var fitness : float = 0.0
 var species_id : int = 0
+var is_speciated : bool = true
 var owner #: NEATPopulation #CYCLIC DEPENDENCIES AAAAAAAAH JUAN PLS FIX
 
 var INPUT_COUNT : int

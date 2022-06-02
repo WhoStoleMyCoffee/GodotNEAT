@@ -54,7 +54,9 @@ func _input(event):
 		print('  reproducing...')
 		pop.gen_over()
 		
-		print(pop.species_data)
+		for k in pop.species_data.keys():
+			print('s%s : %s members' % [k, pop.species_data[k].len])
+		
 		ff()
 		update_display()
 
