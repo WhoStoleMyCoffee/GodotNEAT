@@ -2,6 +2,8 @@ class_name NEATPopulation extends Reference
 
 
 var base_size : int = 0
+var base_genome : NEATNN
+
 var size : int = 0
 var genomes : Array = [] #NEATNN[]
 var species_data : Dictionary = {} #Dict<int id, Dict data>
@@ -14,59 +16,26 @@ var NN_OUTPUTS : int
 var compatibility_threshold : float = 4
 
 var connections_innovs : Dictionary = {} ##Dict<int[2], int>	{ [in0, out0] : innov0, ...}
-
-#----------------------------------------------------------------------------------
-# ** CONFIGS **
-#----------------------------------------------------------------------------------
-var ALLOW_RECURRENT_CONNECTIONS : bool = false
-
-# MUTATION CONFIGS ---------------------------------------------------------
-var MUTATION_WEIGHT_TWEAK_CHANCE : float = 0.8	#tweak weight mutation
-var MUTATION_PER_WEIGHT_TWEAK_CHANCE : float = 0.5	#chance for each connection
-var MUTATION_WEIGHT_PERTUB_CHANCE : float  = 0.95	#chance for a weight to be tuned instead of "reset"
-var MUTATION_WEIGHT_AMT : float = 2.5	#mutation amount
-
-#add connection mutation
-var MUTATION_ADD_CONNECTION_CHANCE : float = 0.05
-
-#add node mutation
-var MUTATION_ADD_NODE_CHANCE : float = 0.01
-
-#toggle mutation
-var MUTATION_CONNECTION_DISABLE_CHANCE : float = 0.02
-var MUTATION_CONNECTION_ENABLE_CHANCE : float = 0.01
-
-
-# SPECIATION CONFIGS ------------------------------------------------------
-var SPECIATION_EXCESS_WEIGHT : float = 1.0
-var SPECIATION_DISJOINT_WEIGHT : float = 1.0
-var SPECIATION_WEIGHT_WEIGHT : float = 0.4 #weight weight haha
-var TARGET_SPECIES : int = 4
-# % of genomes in each species that survive
-var SPECIATION_SURVIVAL_RATE : float = 0.4
-var INTERSPECIES_BREEDING_CHANCE = 0.001
-var DO_ELITISM : bool = true
-#how stale a species can be before it is "reset"
-var SPECIATION_MAX_STALENESS : int = 20
-
+var configs : ConfigFile = ConfigFile.new()
 
 signal gen_over
 
 
-func _init(s : int, nn_inputs : int, nn_outputs : int):
-	NN_INPUTS = nn_inputs
-	NN_OUTPUTS = nn_outputs
+func _init(s : int, base_g : NEATNN, config_path : String):
+	load_configs(config_path)
+	
+	NN_INPUTS = base_g.INPUT_COUNT
+	NN_OUTPUTS = base_g.OUTPUT_COUNT
 	base_size = s
+	base_genome = base_g
 	size = s
 	
 	for i in range(size):
-		genomes.append(NEATNN.new(NN_INPUTS, NN_OUTPUTS))
+		genomes.append(NEATNN.new(0,0).copy(base_genome))
 		genomes[i].species_id = 0
 		genomes[i].owner = self
 	
 	create_species(size)
-	compatibility_threshold *= 1 / float(TARGET_SPECIES)
-
 
 
 #get a connection's innovation id given its input and output nodes
@@ -117,12 +86,15 @@ func reset_fitness():
 
 
 
-func speciate():	
+func speciate():
+	#adjust compatibility threshold
+	compatibility_threshold *= species_data.size() / float(configs.get_value('speciation', 'target_species'))
+	
 	#clear pop real quick
-	var new_species_len : Dictionary = {} #Dict<int sid, int len>
 	for g in genomes:
 		g.is_speciated = false
 	
+	var new_species_len : Dictionary = {} #Dict<int sid, int len>
 	for i in range(genomes.size()):
 		var specimen : NEATNN = genomes[i]
 		if specimen.is_speciated:
@@ -161,13 +133,12 @@ func speciate():
 		species_data[k].len = new_species_len.get(k, 0)
 		if species_data[k].len <= 0:
 			species_data.erase(k)
-	
-	#adjust compatibility threshold
-	compatibility_threshold *= species_data.size() / float(TARGET_SPECIES)
 
 
 
 func reproduce():
+	var survival_rate : float = configs.get_value('speciation', 'survival_rate')
+	var max_staleness : int = configs.get_value('speciation', 'max_staleness')
 	var avg_global_adj_fitness : float = 0.0
 	#"Adjusted Fitness Sum" for each species
 	var afs : Dictionary = {} #Dict<int sid, float sum>
@@ -185,7 +156,7 @@ func reproduce():
 		#create pool while we're at it
 		if !pools.has(sid):
 			pools[sid] = MatingPool.new()
-		if pools[sid].data.size() < ceil(species_data[sid].len * SPECIATION_SURVIVAL_RATE):
+		if pools[sid].data.size() < ceil(species_data[sid].len * survival_rate):
 			pools[sid].add(g)
 	avg_global_adj_fitness /= float(size)
 	
@@ -207,7 +178,7 @@ func reproduce():
 		#	( (afs[sid] / N)      / avg_global_adj_fitness ) * N
 		#Ns cancel out:		afs[sid] / avg_global_adj_fitness
 		var allowed_genomes : int = round(afs[sid] / avg_global_adj_fitness)
-		if sd.age > SPECIATION_MAX_STALENESS:
+		if sd.age > max_staleness:
 			allowed_genomes = 0
 		
 		_reproduce_species(sid, allowed_genomes, pools, new_genomes)
@@ -226,23 +197,24 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 	if count == 0:
 		if species_data.size() == 1: #if last species, reset
 			print('%s --- POPULATION FAILED. Resetting...' % [self])
-			reset( new_genomes, pools[sid].data.keys()[0] )
+			reset(new_genomes)
 		return
 
-#	print('    reproducing species. sid=%s count=%s' % [sid, count])
 	var pool : MatingPool = pools[sid]
 	
-	if DO_ELITISM:
+	var do_elitism : bool = configs.get_value('speciation', 'elitism')
+	var P_interspecies_breeding : float = configs.get_value('speciation', 'P_interspecies_breeding')
+	if do_elitism:
 		#pool.data.keys()[0] = best genome in this species.
 		# its index 0 bc genomes have been sorted in reproduce()
 		new_genomes.append(NEATNN.new(NN_INPUTS, NN_OUTPUTS).copy(pool.data.keys()[0]))
 	
-	for _i in range(count - int(DO_ELITISM)):
+	for _i in range(count - int(do_elitism)):
 		var p1 : NEATNN = pool.pick()
 		var p2 : NEATNN = pool.pick()
 		
 		#CROSS SPECIES BREEDING
-		if randf() < INTERSPECIES_BREEDING_CHANCE:
+		if randf() < P_interspecies_breeding:
 			var rsp : int = species_data.keys()[randi()%species_data.size()]
 			p2 = pools[ rsp ].pick()
 		
@@ -252,13 +224,13 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 		new_genomes.append(child)
 
 
-func reset(arr : Array, base_nn : NEATNN):
+func reset(arr : Array):
 	arr.clear()
 	species_counter = 0
 	gen = 0
 	create_species(base_size)
 	for i in range(base_size):
-		var g : NEATNN = NEATNN.new(NN_INPUTS, NN_OUTPUTS).copy(base_nn)
+		var g : NEATNN = NEATNN.new(0,0).copy(base_genome)
 		mutate(g)
 		g.species_id = 0
 		g.owner = self
@@ -270,22 +242,13 @@ func reset(arr : Array, base_nn : NEATNN):
 func is_compatible(n1 : NEATNN, n2 : NEATNN) -> bool:
 	return NeatUtil.calc_distance(
 		n1, n2,
-		SPECIATION_EXCESS_WEIGHT,
-		SPECIATION_DISJOINT_WEIGHT,
-		SPECIATION_WEIGHT_WEIGHT) < compatibility_threshold
+		configs.get_value('speciation', 'excess_weight'),
+		configs.get_value('speciation', 'disjoint_weight'),
+		configs.get_value('speciation', 'weight_weight')) < compatibility_threshold
 
 
 func mutate(nn : NEATNN):
-	if randf() < MUTATION_WEIGHT_TWEAK_CHANCE:
-		nn.mutate_weights(MUTATION_PER_WEIGHT_TWEAK_CHANCE, MUTATION_WEIGHT_PERTUB_CHANCE, MUTATION_WEIGHT_AMT)
-	if randf() < MUTATION_ADD_CONNECTION_CHANCE:
-		nn.mutate_add_connection(ALLOW_RECURRENT_CONNECTIONS)
-	if randf() < MUTATION_ADD_NODE_CHANCE:
-		nn.mutate_add_node()
-	if randf() < MUTATION_CONNECTION_ENABLE_CHANCE:
-		nn.mutate_enabled(true)
-	if randf() < MUTATION_CONNECTION_DISABLE_CHANCE:
-		nn.mutate_enabled(false)
+	nn.mutate(configs)
 
 
 func gen_over():
@@ -337,3 +300,29 @@ func is_empty() -> bool:
 	return size==0
 
 
+func print_data():
+	print(self, '================')
+	print(' Gen %s\n SPECIES (len=%s):' % [gen, species_data.size()])
+	for k in species_data.keys():
+		var sd : Dictionary = species_data[k]
+		print('  [%s]\t len=%s\tage=%s\tbest=%s' % [k, sd.len, sd.age, sd.best])
+
+
+
+# CONFIGS
+func set_config(section : String, key : String, value): #-> NEATPopulation
+	configs.set_value(section, key, value)
+	return self
+
+func get_config(section : String, key : String, _default=null):
+	return configs.get_value(section, key, _default)
+
+func save_configs(path : String):
+	configs.save(path)
+
+func load_configs(path : String):
+	var err : int = configs.load(path)
+	if err != OK:
+		configs = NeatUtil.create_configfile()
+		save_configs(path)
+		printerr('Config file %s did not exist, please set it up and restart the program' % path)

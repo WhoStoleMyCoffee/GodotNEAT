@@ -6,6 +6,7 @@
 script/source = "extends Node2D
 
 
+const CONFIGPATH : String = 'res://Scenes/Test/configs.cfg'
 const SAVEPATH : String = 'res://Scenes/Test/nn.json'
 
 var pop : NEATPopulation
@@ -26,11 +27,13 @@ var y : Array = [
 
 
 func _ready():
-	pop = NEATPopulation.new(20, 3,1)
-	pop.TARGET_SPECIES = 6
+	var bg : NEATNN = NEATNN.new(3, 1)\\
+		.connect_all_nodes()
+	
+	pop = NEATPopulation.new(20, bg, CONFIGPATH)
 	
 	for g in pop.genomes:
-		pop.mutate(g.connect_all_nodes())
+		pop.mutate(g)
 	
 	ff()
 	$NEATDisplayer.set_drawing_nn(pop.genomes[0])
@@ -54,8 +57,7 @@ func _input(event):
 		print('  reproducing...')
 		pop.gen_over()
 		
-		for k in pop.species_data.keys():
-			print('s%s : %s members' % [k, pop.species_data[k].len])
+		pop.print_data()
 		
 		ff()
 		update_display()
@@ -150,6 +152,7 @@ margin_left = 542.0
 margin_top = 252.0
 margin_right = 667.0
 margin_bottom = 272.0
+focus_mode = 0
 text = "Save this genome"
 
 [node name="Load" type="Button" parent="."]
@@ -157,6 +160,7 @@ margin_left = 542.0
 margin_top = 276.0
 margin_right = 667.0
 margin_bottom = 296.0
+focus_mode = 0
 text = "Load genome"
 
 [connection signal="pressed" from="Button" to="." method="_on_Button_pressed"]

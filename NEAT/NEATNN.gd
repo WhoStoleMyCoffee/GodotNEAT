@@ -84,7 +84,7 @@ func get_biggest_innov() -> int:
 	return result
 
 
-func copy(nn):
+func copy(nn): #-> NEATNN
 	INPUT_COUNT = nn.INPUT_COUNT
 	OUTPUT_COUNT = nn.OUTPUT_COUNT
 	
@@ -110,7 +110,7 @@ func reset():
 
 
 #connect every input node with every hidden node (if any) and every hidden with every output
-func connect_all_nodes():
+func connect_all_nodes(): #-> NEATNNs
 	connections.clear()
 	var hidden_count = get_hidden_nodes_count()
 	
@@ -135,6 +135,22 @@ func set_hidden_nodes_count(count : int):
 
 
 # MUTATION --------------------------------------------------------------------
+func mutate(configs : ConfigFile):
+	if randf() < configs.get_value('mutation', 'P_weight', 0.8):
+		mutate_weights(
+			configs.get_value('mutation', 'P_per_weight', 0.5),
+			configs.get_value('mutation', 'P_weight_pertub', 0.95),
+			configs.get_value('mutation', 'weight_amt', 2.5))
+	if randf() < configs.get_value('mutation', 'P_connection', 0.05):
+		mutate_add_connection( configs.get_value('mutation', 'allow_recurrent', true) )
+	if randf() < configs.get_value('mutation', 'P_node', 0.01):
+		mutate_add_node()
+	if randf() < configs.get_value('mutation', 'P_enable', 0.01):
+		mutate_enabled(true)
+	if randf() < configs.get_value('mutation', 'P_disable', 0.01):
+		mutate_enabled(false)
+
+
 func mutate_weights(per_weight_chance : float, pertub_chance : float, amt : float):
 	for c in connections:
 		if randf() > per_weight_chance: continue

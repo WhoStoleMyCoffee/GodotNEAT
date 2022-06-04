@@ -2,6 +2,31 @@ extends Node
 
 
 
+func create_configfile() -> ConfigFile:
+	var cf : ConfigFile = ConfigFile.new()
+	
+	cf.set_value('mutation', 'P_weight', 0.8)
+	cf.set_value('mutation', 'P_per_weight', 0.5)
+	cf.set_value('mutation', 'P_weight_pertub', 0.95)
+	cf.set_value('mutation', 'weight_amt', 2.5)
+	cf.set_value('mutation', 'P_connection', 0.05)
+	cf.set_value('mutation', 'allow_recurrent', true)
+	cf.set_value('mutation', 'P_node', 0.01)
+	cf.set_value('mutation', 'P_enable', 0.01)
+	cf.set_value('mutation', 'P_disable', 0.01)
+	
+	cf.set_value('speciation', 'excess_weight', 1.0)
+	cf.set_value('speciation', 'disjoint_weight', 1.0)
+	cf.set_value('speciation', 'weight_weight', 0.4)
+	cf.set_value('speciation', 'target_species', 10)
+	cf.set_value('speciation', 'survival_rate', 0.4)
+	cf.set_value('speciation', 'P_interspecies_breeding', 0.001)
+	cf.set_value('speciation', 'elitism', true)
+	cf.set_value('speciation', 'max_staleness', 20)
+	
+	return cf
+
+
 # CROSSOVER ---------------------------------------------------------------
 #https://github.com/F3R70/NEAT/blob/master/src/genome.cpp#L2085 onwards
 # p1 is expected to be more fit than p2
