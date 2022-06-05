@@ -7,7 +7,7 @@ const RAYS_COUNT : int = 4
 const VIEWDIST = 512.0
 
 const TARGET_WEIGHT : float = 500.0
-const DIST_WEIGHT : float = 0.2
+const DIST_WEIGHT : float = 0.01
 const COMPLETED_WEIGHT : float = 1000.0
 
 const spd : float = 100.0
@@ -51,7 +51,9 @@ func set_brain(nn : NEATNN):
 func reset():
 	position = Vector2(512.0, 300.0)
 	tt = 0.0
+	targets_hit = 0
 	current_target = get_node('../Targets/t0')
+	completed = false
 
 
 func _process(delta):
@@ -59,15 +61,18 @@ func _process(delta):
 		return
 	
 	
+	brain.fitness += (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT
+	
 	vel = move_and_slide(vel) * friction
 	if position.distance_squared_to(current_target.position) < TARGET_RADIUS*TARGET_RADIUS:
 		if targets_hit == TARGET_COUNT-1:
+			brain.fitness += COMPLETED_WEIGHT
 			completed = true
 			return
 
+		brain.fitness += TARGET_WEIGHT
 		targets_hit += 1
-		current_target = get_node('../../Targets/t%s' % targets_hit)
-	
+		current_target = get_node('../Targets/t%s' % targets_hit)
 	
 	tt += delta
 	if tt < refresh_rate:
@@ -90,9 +95,9 @@ func think():
 
 func evaluate():
 	pass
-	brain.fitness = (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT\
-		+ targets_hit*TARGET_WEIGHT\
-		+ int(completed)*COMPLETED_WEIGHT
+#	brain.fitness = (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT\
+#		+ targets_hit*TARGET_WEIGHT\
+#		+ int(completed)*COMPLETED_WEIGHT
 
 
 func get_inputs() -> Array:
