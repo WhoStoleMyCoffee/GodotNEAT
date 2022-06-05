@@ -195,7 +195,8 @@ func reproduce():
 #pool : pool of ALL species
 func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes : Array):
 	if count == 0:
-		if species_data.size() == 1: #if last species, reset
+		species_data.erase(sid)
+		if species_data.size() == 0: #if last species, reset
 			print('%s --- POPULATION FAILED. Resetting...' % [self])
 			reset(new_genomes)
 		return
@@ -218,7 +219,9 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 			var rsp : int = species_data.keys()[randi()%species_data.size()]
 			p2 = pools[ rsp ].pick()
 		
-		var child : NEATNN = NeatUtil.crossover(p2, p1) if p2.fitness > p1.fitness else NeatUtil.crossover(p1, p2)
+		var child : NEATNN
+		if p2.fitness > p1.fitness:	child = NeatUtil.crossover(p2, p1)
+		else:						child = NeatUtil.crossover(p1, p2)
 		child.owner = self
 		mutate(child)
 		new_genomes.append(child)
@@ -302,10 +305,26 @@ func is_empty() -> bool:
 
 func print_data():
 	print(self, '================')
-	print(' Gen %s\n SPECIES (len=%s):' % [gen, species_data.size()])
+	print(' Gen %s\nGENOMES: %s\n SPECIES (len=%s):' % [gen, genomes.size(), species_data.size()])
 	for k in species_data.keys():
 		var sd : Dictionary = species_data[k]
 		print('  [%s]\t len=%s\tage=%s\tbest=%s' % [k, sd.len, sd.age, sd.best])
+
+
+func get_best_genome() -> NEATNN:
+	var best_f : float = -1.0
+	var best_g : NEATNN
+	
+	for g in genomes:
+		if g.fitness > best_f:
+			best_f = g.fitness
+			best_g = g
+	
+	return best_g
+
+
+func get_genome(idx : int) -> NEATNN:
+	return genomes[idx]
 
 
 

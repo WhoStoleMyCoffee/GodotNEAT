@@ -17,7 +17,7 @@ var OUTPUT_COUNT : int
 func _init(input_count : int, output_count : int) -> void:
 	INPUT_COUNT = input_count
 	OUTPUT_COUNT = output_count
-	nodes.resize(INPUT_COUNT + OUTPUT_COUNT)
+	resize_nodes(INPUT_COUNT + OUTPUT_COUNT)
 
 
 func feed_forward(X : Array) -> Array:
@@ -50,7 +50,7 @@ func feed_forward(X : Array) -> Array:
 
 
 func add_connection(c : Dictionary) -> void:
-	nodes.resize(max(nodes.size(), max(c.n[0], c.n[1])+1))
+	resize_nodes(max(nodes.size(), max(c.n[0], c.n[1])+1))
 	var i : int = connections.bsearch_custom(c.i, self, "_compare_connections", true)
 	connections.insert(i, c)
 
@@ -88,8 +88,7 @@ func copy(nn): #-> NEATNN
 	INPUT_COUNT = nn.INPUT_COUNT
 	OUTPUT_COUNT = nn.OUTPUT_COUNT
 	
-	nodes.resize(0)
-	nodes.resize(nn.nodes.size())
+	resize_nodes(nn.nodes.size())
 	connections = nn.connections.duplicate(true)
 	fitness = nn.fitness
 	species_id = nn.species_id
@@ -98,7 +97,7 @@ func copy(nn): #-> NEATNN
 
 
 func get_color() -> Color:
-	return owner.get_species_color(species_id) if owner else Color.transparent
+	return owner.get_species_color(species_id) if owner else Color.white
 
 
 func reset():
@@ -130,7 +129,22 @@ func connect_all_nodes(): #-> NEATNNs
 
 
 func set_hidden_nodes_count(count : int):
-	nodes.resize(INPUT_COUNT + OUTPUT_COUNT + count)
+	resize_nodes(INPUT_COUNT + OUTPUT_COUNT + count)
+
+
+func resize_nodes(size : int):
+	if size < nodes.size():
+		nodes.resize(size)
+		return
+	
+	for _i in range(size-nodes.size()):
+		nodes.append(0.0)
+
+
+#sets all nodes to 0
+func zero_out_nodes():
+	for i in range(nodes.size()):
+		nodes[i] = 0
 
 
 
@@ -234,7 +248,7 @@ func get_save_data() -> Array:
 func load_save_data(d : Array):
 	INPUT_COUNT = int(d[0])
 	OUTPUT_COUNT = int(d[1])
-	nodes.resize(int(d[2]))
+	resize_nodes(int(d[2]))
 	fitness = d[3]
 	species_id = int(d[4])
 	
@@ -275,5 +289,6 @@ func print_data():
 
 
 func activation_func(x : float):
-#	return 1/(1+exp(-4*x))
-	return tanh(x)*0.5 + 0.5
+#	return 1/(1+exp(-x)) #sigmoid
+	return 1/(1+exp(-4*x)) #steeper sigmoid
+#	return tanh(x)*0.5 + 0.5 #tanh

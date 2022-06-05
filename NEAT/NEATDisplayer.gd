@@ -21,8 +21,13 @@ var NN setget set_drawing_nn
 var node_positions_cache := []
 
 
+func _ready():
+	connect("visibility_changed", self, '_on_visibility_changed')
+
+
 func set_drawing_nn(_nn):
 	NN = _nn
+	if !visible: return
 	cache_node_positions()
 	update()
 
@@ -124,3 +129,9 @@ func cache_node_positions():
 func set_bounds(v : Vector2):
 	size = v
 	rect_min_size = v
+
+
+func _on_visibility_changed():
+	if visible:
+		cache_node_positions()
+		update()

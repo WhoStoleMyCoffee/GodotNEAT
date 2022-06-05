@@ -33,8 +33,8 @@ func create_configfile() -> ConfigFile:
 # both parents' genes are expected to be already sorted.
 #	(genes are automatically sorted when adding a connection. to manually sort, call NEAT::sort_connections())
 #oh boy i cant wait for lambdas.
-func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
-	var offspring : NEATNN = NEATNN.new(0,0).copy(p1)
+func crossover(p1, p2):
+	var offspring : NEATNN = NEATNN.new(p1.INPUT_COUNT,p1.OUTPUT_COUNT).copy(p1)
 	
 	var p1genes : Array = p1.connections
 	var p2genes : Array = p2.connections
@@ -61,7 +61,7 @@ func crossover(p1 : NEATNN, p2 : NEATNN) -> NEATNN:
 			co.e = false
 		
 	
-	offspring.nodes.resize( max(p1.nodes.size(), p2.nodes.size()) )
+	offspring.resize_nodes( max(p1.nodes.size(), p2.nodes.size()) )
 	offspring.species_id = p1.species_id if p1.fitness > p2.fitness else p2.species_id
 	return offspring
 
