@@ -5,7 +5,7 @@ const CONFIGPATH : String = 'res://Scenes/Pathfinding/configs.cfg'
 const SAVEPATH : String = 'res://Scenes/Pathfinding/nn.json'
 const AGENT = preload("res://Scenes/Pathfinding/Agent.tscn")
 
-const RUN_TIME : float = 2.0
+const RUN_TIME : float = 3.0
 
 onready var Displayer = $CanvasLayer/UI/NEATDisplayer
 
@@ -18,8 +18,8 @@ func _ready():
 	
 	yield(get_tree(), "idle_frame")
 	
-	var bg : NEATNN = NEATNN.new(7, 4)
-	pop = NEATPopulation.new(20, bg, CONFIGPATH)
+	var bg : NEATNN = NEATNN.new(8, 4)
+	pop = NEATPopulation.new(bg, CONFIGPATH)
 	
 	for g in pop.genomes:
 		for _i in range(20):
@@ -40,6 +40,8 @@ func next_genome():
 
 
 func _on_Timer_timeout():
+	$Timer.start(RUN_TIME)
+	
 	if di < pop.size():
 		next_genome()
 		return

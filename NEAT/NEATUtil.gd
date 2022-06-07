@@ -36,6 +36,9 @@ func create_configfile() -> ConfigFile:
 func crossover(p1, p2):
 	var offspring : NEATNN = NEATNN.new(p1.INPUT_COUNT,p1.OUTPUT_COUNT).copy(p1)
 	
+	if p1 == p2:
+		return offspring
+	
 	var p1genes : Array = p1.connections
 	var p2genes : Array = p2.connections
 	for i in range(p2genes.size()):

@@ -21,14 +21,14 @@ var configs : ConfigFile = ConfigFile.new()
 signal gen_over
 
 
-func _init(s : int, base_g : NEATNN, config_path : String):
+func _init(base_g : NEATNN, config_path : String):
 	load_configs(config_path)
 	
 	NN_INPUTS = base_g.INPUT_COUNT
 	NN_OUTPUTS = base_g.OUTPUT_COUNT
-	base_size = s
+	base_size = configs.get_value('speciation', 'base_size')
 	base_genome = base_g
-	size = s
+	size = base_size
 	
 	for i in range(size):
 		genomes.append(NEATNN.new(0,0).copy(base_genome))

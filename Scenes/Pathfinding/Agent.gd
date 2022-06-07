@@ -7,12 +7,16 @@ const RAYS_COUNT : int = 4
 const VIEWDIST = 512.0
 
 const TARGET_WEIGHT : float = 500.0
-const DIST_WEIGHT : float = 0.01
+const DIST_WEIGHT : float = 0.001
 const COMPLETED_WEIGHT : float = 1000.0
+const COLLISION_WEIGHT : float = 0.95
 
 const spd : float = 100.0
 const friction : float = 0.9
 const refresh_rate : float = 0.1
+const EXTRA_TIME : float = 3.0
+
+onready var timer : Timer = get_node('../Timer')
 
 var current_target : Position2D
 var targets_hit : int = 0
@@ -20,7 +24,7 @@ var completed : bool = false
 var brain : NEATNN
 var tt : float = 0.0
 """
-inputs: rays(4) + dir to target(2) + bias -> 7
+inputs: rays(4) + dir to target(2) + dist to target(1) + bias -> 8
 outputs: left force, right, up, down -> 4
 """
 
@@ -49,6 +53,7 @@ func set_brain(nn : NEATNN):
 
 
 func reset():
+	vel *= 0
 	position = Vector2(512.0, 300.0)
 	tt = 0.0
 	targets_hit = 0
@@ -64,6 +69,11 @@ func _process(delta):
 	brain.fitness += (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT
 	
 	vel = move_and_slide(vel) * friction
+	if is_on_wall():
+		brain.fitness *= COLLISION_WEIGHT
+	
+	
+	
 	if position.distance_squared_to(current_target.position) < TARGET_RADIUS*TARGET_RADIUS:
 		if targets_hit == TARGET_COUNT-1:
 			brain.fitness += COMPLETED_WEIGHT
@@ -73,6 +83,8 @@ func _process(delta):
 		brain.fitness += TARGET_WEIGHT
 		targets_hit += 1
 		current_target = get_node('../Targets/t%s' % targets_hit)
+		
+		timer.start(timer.time_left + EXTRA_TIME)
 	
 	tt += delta
 	if tt < refresh_rate:
@@ -105,7 +117,8 @@ func get_inputs() -> Array:
 	var X : Array = [
 		1.0, #bias
 		dir.x*0.5 + 0.5,
-		dir.y*0.5 + 0.5
+		dir.y*0.5 + 0.5,
+		position.distance_to(current_target.position) / 1500.0
 	]
 	
 	for i in range(RAYS_COUNT):
