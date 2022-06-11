@@ -1,14 +1,28 @@
 class_name NEATNN extends Reference
 
 
-var connections : Array = [] #Dict[]
+enum {
+	INDEX_INPUTS=0,
+	INDEX_OUTPUTS=1,
+	INDEX_SIZE=2,
+	INDEX_FITNESS=3,
+	INDEX_SPECIES=4,
+	
+	#connections index
+	INDEX_CONNECTIONS=5, #index from which connections data start at in genes
+	C_LEN=3, #length of one connection in genes
+	INDEX_INNOV=0,
+	INDEX_NODES=1,
+	INDEX_WEIGHT=2
+}
+var genes : Array
 var nodes : PoolRealArray = PoolRealArray()
 
-var fitness : float = 0.0
-var species_id : int = 0
 var is_speciated : bool = true
 var owner #: NEATPopulation #CYCLIC DEPENDENCIES AAAAAAAAH JUAN PLS FIX
 
+#var fitness : float = 0.0
+#var species_id : int = 0
 var INPUT_COUNT : int
 var OUTPUT_COUNT : int
 
@@ -17,6 +31,13 @@ var OUTPUT_COUNT : int
 func _init(input_count : int, output_count : int) -> void:
 	INPUT_COUNT = input_count
 	OUTPUT_COUNT = output_count
+	genes = [
+		INPUT_COUNT,
+		OUTPUT_COUNT,
+		INPUT_COUNT+OUTPUT_COUNT,
+		0.0,
+		0
+	]
 	resize_nodes(INPUT_COUNT + OUTPUT_COUNT)
 
 
@@ -31,14 +52,16 @@ func feed_forward(X : Array) -> Array:
 		nodes[i] = float(X[i])
 		
 		#recurrent connections
-		for c in connections:
-			if c.n[1] != i or !c.e: continue
-			nodes[i] += nodes[c.n[0]]*c.w
+		for c in range(INDEX_CONNECTIONS, genes.size(), C_LEN):
+			#check if connecion.out is this node && its enabled
+			if get_c_out(c) != i or !is_c_enabled(c): continue
+			nodes[i] += nodes[get_c_in(c)]*get_c_w(c)
 	
 	#rest of the connections
-	for c in connections:
-		if is_node_input(c.n[1]) or !c.e: continue #skip if recurrent (or not enabled)
-		new_nodes[c.n[1]] += nodes[c.n[0]]*c.w
+	for c in range(INDEX_CONNECTIONS, genes.size(), C_LEN):
+		#skip if recurrent (or not enabled)
+		if is_node_input(get_c_out(c)) or !is_c_enabled(c): continue
+		new_nodes[get_c_out(c)] += nodes[get_c_in(c)]*get_c_w(c)
 	
 	#activate
 	for i in range(nodes.size()):
@@ -49,19 +72,21 @@ func feed_forward(X : Array) -> Array:
 	return y
 
 
-func add_connection(c : Dictionary) -> void:
-	resize_nodes(max(nodes.size(), max(c.n[0], c.n[1])+1))
-	var i : int = connections.bsearch_custom(c.i, self, "_compare_connections", true)
-	connections.insert(i, c)
+func add_connection(c : Array) -> void:
+	resize_nodes(max(nodes.size(), max((c[INDEX_NODES]>>16)&0xFFFF, c[INDEX_NODES]&0xFFFF)+1))
+	var i : int = search_connection(abs(c[INDEX_INNOV]))
+	genes.insert(i, c[0])
+	genes.insert(i+1, c[1])
+	genes.insert(i+2, c[2])
 
 
-func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
-	return {
-		'i' : owner.get_connection_innov(_in, _out) if owner else connections.size(),
-		'n' : PoolIntArray([_in, _out]),
-		'w' : _w,
-		'e' : _enabled
-	}
+func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Array:
+	var i : int = owner.get_connection_innov(_in, _out) if owner else get_connections_count()
+	return [
+		i * (int(_enabled)-int(!_enabled)), #i if enabled, -i if disabled
+		((_in&0xFFFF)<<16) | (_out&0xFFFF),
+		_w
+	]
 
 
 
@@ -72,59 +97,25 @@ func is_node_output(i : int) -> bool:
 	return i>=INPUT_COUNT and i<INPUT_COUNT+OUTPUT_COUNT
 
 
-func set_connection_enabled(i : int, v : bool):
-	connections[i].e = v
-
-
-
-func get_biggest_innov() -> int:
-	var result : int = 0
-	for c in connections:
-		result = max(result, c.i)
-	return result
-
-
 func copy(nn): #-> NEATNN
 	INPUT_COUNT = nn.INPUT_COUNT
 	OUTPUT_COUNT = nn.OUTPUT_COUNT
 	
 	resize_nodes(nn.nodes.size())
-	connections = nn.connections.duplicate(true)
-	fitness = nn.fitness
-	species_id = nn.species_id
+	genes = nn.genes.duplicate()
 	owner = nn.owner
 	return self
 
 
 func get_color() -> Color:
-	return owner.get_species_color(species_id) if owner else Color.white
+	return owner.get_species_color(get_species_id()) if owner else Color.white
 
 
 func reset():
 	nodes.resize(0)
-	connections.clear()
-	fitness = 0.0
-	species_id = 0
-	return self
-
-
-#connect every input node with every hidden node (if any) and every hidden with every output
-func connect_all_nodes(): #-> NEATNNs
-	connections.clear()
-	var hidden_count = get_hidden_nodes_count()
-	
-	if hidden_count == 0:
-		for i in range(INPUT_COUNT):
-			for o in range(OUTPUT_COUNT):
-				add_connection(create_connection(i, INPUT_COUNT+o, 1, true))
-		return self
-		
-	for i in range(INPUT_COUNT):
-		for o in range(hidden_count):
-			add_connection(create_connection(i, INPUT_COUNT+OUTPUT_COUNT+o, 1, true))
-	for i in range(hidden_count):
-		for o in range(OUTPUT_COUNT):
-			add_connection(create_connection(INPUT_COUNT+OUTPUT_COUNT+i, INPUT_COUNT+o, 1, true))
+	genes.resize(INDEX_CONNECTIONS)
+	genes[INDEX_FITNESS] = 0.0
+	genes[INDEX_SPECIES] = 0
 	return self
 
 
@@ -166,9 +157,9 @@ func mutate(configs : ConfigFile):
 
 
 func mutate_weights(per_weight_chance : float, pertub_chance : float, amt : float):
-	for c in connections:
+	for c in range(INDEX_CONNECTIONS, genes.size(), C_LEN):
 		if randf() > per_weight_chance: continue
-		c.w = c.w+rand_range(-1,1)*amt if randf() < pertub_chance else rand_range(-2,2)
+		genes[c+INDEX_WEIGHT] = (get_c_w(c)+rand_range(-amt,amt)) if randf()<pertub_chance else (rand_range(-amt,amt))
 
 
 #add a connection going from in_node to out_node
@@ -180,22 +171,24 @@ func mutate_add_connection(allow_recurrent : bool):
 		return
 	
 	#if connection already exists, skip
-	for c in connections:
-		if (c.n[0]==in_node and c.n[1]==out_node) or (c.n[1]==in_node and c.n[0]==out_node): return
+	for c in range(INDEX_CONNECTIONS, genes.size(), C_LEN):
+		if (get_c_in(c)==in_node and get_c_out(c)==out_node) or \
+			(get_c_out(c)==in_node and get_c_in(c)==out_node): return
 	
 	#add connection
 	add_connection( create_connection(in_node, out_node, 0.0, true) )
 
 
 func mutate_add_node():
-	if connections.empty(): return
+	var ccount : int = get_connections_count()
+	if ccount==0: return
 	
 #	find a random connection that is enabled
 	#[in_node -> out_node]
-	var bridge_con : Dictionary = connections[randi() % connections.size()]
-	var t : int = 0
-	while !bridge_con.e and t<5:
-		bridge_con = connections[randi() % connections.size()]
+	var bridge_con : int = (randi()%ccount)*3 + INDEX_CONNECTIONS
+	var t : int = 0 # # of tries
+	while !is_c_enabled(bridge_con) and t<5: #haha magic numbers go brrrrr
+		bridge_con = (randi()%ccount)*3 + INDEX_CONNECTIONS
 		t += 1
 	
 	#add next node
@@ -203,23 +196,24 @@ func mutate_add_node():
 	nodes.append(0.0)
 	
 	#disable [in_node -> out_node]
-	bridge_con.e = false
+	set_c_enabled(bridge_con, false)
 	#add [in_node -> next_node]
-	add_connection(create_connection(bridge_con.n[0], next_node_id, 1.0, true))
+	add_connection(create_connection(get_c_in(bridge_con), next_node_id, 1.0, true))
 	#add [next_node -> out_node]
-	add_connection(create_connection(next_node_id, bridge_con.n[1], bridge_con.w, true))
+	add_connection(create_connection(next_node_id, get_c_out(bridge_con), get_c_w(bridge_con), true))
 
 
 func mutate_enabled(enable : bool):
-	if connections.empty(): return
-	connections[randi() % connections.size()].is_enabled = enable
+	if get_connections_count()==0: return
+	var i : int = (randi()%get_connections_count())*3 + INDEX_CONNECTIONS
+	set_c_enabled(i, enable)
 
 
 # SAVE & LOAD -------------------------------------------------------------
 func save_json(path : String):
 	var f : File = File.new()
 	f.open(path, File.WRITE)
-	f.store_line(to_json(get_compressed()))
+	f.store_line(to_json(genes))
 	f.close()
 
 
@@ -228,38 +222,24 @@ func load_json(path : String):
 	f.open(path, File.READ)
 	var d : Array = parse_json(f.get_as_text())
 	f.close()
-	load_compressed(d)
-
-
-func get_compressed() -> Array:
-	var data : Array = [
-		INPUT_COUNT,
-		OUTPUT_COUNT,
-		nodes.size(),
-		fitness,
-		species_id
-	]
-	for c in connections:
-		data.append_array(NeatUtil.compress_connection(c))
-	
-	return data
-
-
-func load_compressed(d : Array):
-	INPUT_COUNT = int(d[0])
-	OUTPUT_COUNT = int(d[1])
-	resize_nodes(int(d[2]))
-	fitness = d[3]
-	species_id = int(d[4])
-	
-	connections.clear()
-	for i in range(5, d.size(), 3):
-		connections.append(NeatUtil.uncompress_connection(int(d[i]), int(d[i+1]), d[i+2]))
-	return self
+	genes = d
 
 
 
 # UTIL --------------------------------------------------------------------
+func get_fitness() -> float:
+	return genes[INDEX_FITNESS]
+
+func set_fitness(v : float):
+	genes[INDEX_FITNESS] = v
+
+func get_species_id() -> int:
+	return genes[INDEX_SPECIES]
+
+func set_species_id(v : int):
+	genes[INDEX_SPECIES] = v
+
+
 func get_hidden_nodes_count() -> int:
 	return nodes.size() - (INPUT_COUNT+OUTPUT_COUNT)
 
@@ -267,25 +247,19 @@ func get_hidden_nodes_count() -> int:
 func _compare_connections(a, b) -> bool:
 	return a.i < b
 
-func get_connection(innov : int):
-	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
-	return connections[i] if i < connections.size() and connections[i].i == innov else null
-
-func has_connection(innov : int) -> bool:
-	var i : int = connections.bsearch_custom(innov, self, "_compare_connections", true)
-	return i < connections.size()
+func get_connection(innov : int) -> int:
+	var i : int = search_connection(innov)
+	return i if i<genes.size() and get_c_innov(i)==innov else null
 
 
 func print_data():
 	print(self, ' ----------')
 	print('%s nodes' % nodes.size())
 	print('CONNECTIONS:')
-	for c in connections:
-		var s : String = '(%s) [%s -> %s]' % [c.i, c.n[0], c.n[1]]
-		
-		if !c.e:
+	for c in range(INDEX_CONNECTIONS, genes.size(), C_LEN):
+		var s : String = '(%s) [%s -> %s]' % [get_c_innov(c), get_c_in(c), get_c_out(c)]
+		if !is_c_enabled(c):
 			s += ' DISABLED'
-		
 		print(s)
 
 
@@ -293,3 +267,36 @@ func activation_func(x : float):
 #	return 1/(1+exp(-x)) #sigmoid
 	return 1/(1+exp(-4*x)) #steeper sigmoid
 #	return tanh(x)*0.5 + 0.5 #tanh
+
+
+#i : the start of the connection in genes
+func get_c_in(i : int) -> int:
+	return (genes[i+INDEX_NODES]>>16)&0xFFFF
+
+func get_c_out(i : int) -> int:
+	return genes[i+INDEX_NODES]&0xFFFF
+
+func get_c_w(i : int) -> float:
+	return genes[i+INDEX_WEIGHT]
+
+func get_c_innov(i : int) -> int:
+	return int(abs(genes[i]))
+
+func is_c_enabled(i : int) -> bool:
+	return genes[i] >= 0
+
+func set_c_enabled(i : int, enable : bool):
+	genes[i] = abs(genes[i]) * (1 if enable else -1)
+
+
+func get_connections_count() -> int:
+	return (genes.size()-INDEX_CONNECTIONS) / 3
+
+
+#finds a connection by innov
+#if not found, return the index where it should be inserted
+func search_connection(innov : int) -> int:
+	for c in range(genes.size()-C_LEN, INDEX_CONNECTIONS-1, -1):
+		if get_c_innov(c) == innov: return c
+		if get_c_innov(c) < innov: return c+C_LEN
+	return INDEX_CONNECTIONS

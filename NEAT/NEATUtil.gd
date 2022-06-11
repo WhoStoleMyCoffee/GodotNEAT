@@ -139,17 +139,12 @@ func pick_from_pool(pool : Dictionary) -> NEATNN:
 	return pool.keys()[1] #just in case
 
 
-func compress_connection(c : Dictionary) -> Array:
-	var a : int = c.i * (int(c.e)-int(!c.e)) #c.i if enabled, -c.i if disabled
-	var b : int = ((c.n[0] & 0xFFFF) << 16) | (c.n[1] & 0xFFFF)
-	var w : float = c.w
-	return [a, b, w]
+
+#TODO delete these if unused
+func get_c_in(cb : int) -> int:
+	return (cb>>16)&0xFFFF
+
+func get_c_out(cb : int) -> int:
+	return cb&0xFFFF
 
 
-func uncompress_connection(a : int, b : int, c : float) -> Dictionary:
-	return {
-		'i' : abs(a),
-		'n' : PoolIntArray([b >> 16, b & 0xFFFF]),
-		'w' : c,
-		'e' : (a >= 0)
-	}
