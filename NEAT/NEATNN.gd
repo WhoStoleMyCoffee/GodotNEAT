@@ -244,12 +244,11 @@ func get_hidden_nodes_count() -> int:
 	return nodes.size() - (INPUT_COUNT+OUTPUT_COUNT)
 
 
-func _compare_connections(a, b) -> bool:
-	return a.i < b
-
+#get connection idx by innov
+#returns -1 if not found
 func get_connection(innov : int) -> int:
 	var i : int = search_connection(innov)
-	return i if i<genes.size() and get_c_innov(i)==innov else null
+	return i if i<genes.size() and get_c_innov(i)==innov else -1
 
 
 func print_data():
@@ -271,10 +270,10 @@ func activation_func(x : float):
 
 #i : the start of the connection in genes
 func get_c_in(i : int) -> int:
-	return (genes[i+INDEX_NODES]>>16)&0xFFFF
+	return (int(genes[i+INDEX_NODES])>>16)&0xFFFF
 
 func get_c_out(i : int) -> int:
-	return genes[i+INDEX_NODES]&0xFFFF
+	return int(genes[i+INDEX_NODES])&0xFFFF
 
 func get_c_w(i : int) -> float:
 	return genes[i+INDEX_WEIGHT]

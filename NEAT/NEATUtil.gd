@@ -29,43 +29,39 @@ func create_configfile() -> ConfigFile:
 
 # CROSSOVER ---------------------------------------------------------------
 #https://github.com/F3R70/NEAT/blob/master/src/genome.cpp#L2085 onwards
-# p1 is expected to be more fit than p2
+# P1 IS EXPECTED TO BE MORE FIT THAN P2
 # both parents' genes are expected to be already sorted.
-#	(genes are automatically sorted when adding a connection. to manually sort, call NEAT::sort_connections())
-#oh boy i cant wait for lambdas.
+#	(genes are automatically sorted when adding a connection. to manually sort... good luck ;) )
 func crossover(p1, p2):
 	var offspring : NEATNN = NEATNN.new(p1.INPUT_COUNT,p1.OUTPUT_COUNT).copy(p1)
 	
 	if p1 == p2:
 		return offspring
 	
-	var p1genes : Array = p1.connections
-	var p2genes : Array = p2.connections
-	for i in range(p2genes.size()):
-		var c2 : Dictionary = p2genes[i] # <- connection/gene
+	for c2 in range(NEATNN.INDEX_CONNECTIONS, p2.genes.size(), NEATNN.C_LEN):
+		
+		var c2i : int = p2.get_c_innov(c2)
 		
 		#EXCESS GENES (skip the rest of the worse parent)
-		if !p1genes.empty() and c2.i > p1genes[-1].i:
+		if p1.get_connections_count()>0 and c2i > p1.get_c_innov(-3):
 			break
 		
-		var co = offspring.get_connection(c2.i)
+		var co : int = offspring.get_connection(c2i)
 		#DISJOINT GENES
-		if co == null:
-			offspring.add_connection(c2.duplicate(true))
+		if co == -1:
+			offspring.add_connection(p2.genes.slice(c2, c2+NEATNN.C_LEN))
 			continue
 		
 		#MATCHING GENES
 		if randf() < 0.5:
 			#set weight to p2's weight
-			co.w = c2.w
+			offspring.genes[co+NEATNN.INDEX_WEIGHT] = p2.get_c_w(c2)
 		
 		#if one gene is disabled, the corresponding gene in the offspring will likely be disabled
-		if !c2.e and randf() < 0.75:
-			co.e = false
-		
+		if !p2.is_c_enabled(c2) and randf() < 0.75:
+			offspring.set_c_enabled(co, false)
 	
 	offspring.resize_nodes( max(p1.nodes.size(), p2.nodes.size()) )
-	offspring.species_id = p1.species_id if p1.fitness > p2.fitness else p2.species_id
 	return offspring
 
 
@@ -78,47 +74,46 @@ func calc_distance(n1 : NEATNN, n2 : NEATNN, EXCESS_WEIGHT : float, DISJOINT_WEI
 	var E : int = 0
 	var D : int = 0
 	var W : float = 0.0
-	var matching_genes_count : int = 0
-	
+	var matching_genes_count : float = 0.0
+	var C_LEN : int = NEATNN.C_LEN
 	
 	#loop both NNs' genes
-	var i1 : int = 0
-	var i2 : int = 0
-	var n1_genes_size : int = n1.connections.size()
-	var n2_genes_size : int = n2.connections.size()
+	var i1 : int = NEATNN.INDEX_CONNECTIONS
+	var i2 : int = NEATNN.INDEX_CONNECTIONS
+	var n1_genes_size : int = n1.genes.size()
+	var n2_genes_size : int = n2.genes.size()
 	while (i1 < n1_genes_size) or (i2 < n2_genes_size):
 		
 #		EXCESS GENES
 		if i1 == n1_genes_size or i2 == n2_genes_size:
 			E += 1
 			#increment the one with the excess genes
-			i1 += int(i1 < n1_genes_size)
-			i2 += int(i2 < n2_genes_size)
+			i1 += int(i1 < n1_genes_size)*C_LEN
+			i2 += int(i2 < n2_genes_size)*C_LEN
 			continue
 		
-		var c1 : Dictionary = n1.connections[i1]
-		var c2 : Dictionary = n2.connections[i2]
-		
 #		MATCHING GENES
-		if c1.i == c2.i:
-			W += abs(c1.w - c2.w)
-			matching_genes_count += 1
-			i1 += 1
-			i2 += 1
+		var i1_i : int = n1.get_c_innov(i1)
+		var i2_i : int = n2.get_c_innov(i2)
+		if i1_i == i2_i:
+			W += abs(n1.get_c_w(i1) - n2.get_c_w(i2))
+			matching_genes_count += 1.0
+			i1 += C_LEN
+			i2 += C_LEN
 		
 #		DISJOINT GENES
 		else:
 			D += 1
 			#increment the smaller one
-			i1 += int(c1.i < c2.i)
-			i2 += int(c2.i < c1.i)
+			i1 += int(i1_i < i2_i)*C_LEN
+			i2 += int(i2_i < i1_i)*C_LEN
 	
 	
 	#calc avg weight difference of matching genes
-	W /= max(float(matching_genes_count), 1.0)
+	W /= max(matching_genes_count, 1.0)
 	
 	var N : int = max(n1.nodes.size(), n2.nodes.size())
-	return (EXCESS_WEIGHT * E / N) + (DISJOINT_WEIGHT * D / N) + (WEIGHT_WEIGHT * W)
+	return (EXCESS_WEIGHT*E/N) + (DISJOINT_WEIGHT*D/N) + (WEIGHT_WEIGHT*W)
 
 
 
@@ -137,14 +132,5 @@ func pick_from_pool(pool : Dictionary) -> NEATNN:
 			return k
 		v -= pool[k]
 	return pool.keys()[1] #just in case
-
-
-
-#TODO delete these if unused
-func get_c_in(cb : int) -> int:
-	return (cb>>16)&0xFFFF
-
-func get_c_out(cb : int) -> int:
-	return cb&0xFFFF
 
 
