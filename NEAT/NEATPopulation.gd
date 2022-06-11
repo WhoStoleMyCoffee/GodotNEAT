@@ -15,7 +15,7 @@ var NN_OUTPUTS : int
 
 var compatibility_threshold : float = 4
 
-var connections_innovs : Dictionary = {} ##Dict<int[2], int>	{ [in0, out0] : innov0, ...}
+var connections_innovs : Dictionary = {} ##Dict<poolint[2], int>	{ [in0, out0] : innov0, ...}
 var configs : ConfigFile = ConfigFile.new()
 
 signal gen_over
@@ -35,7 +35,8 @@ func _init(base_g : NEATNN, config_path : String):
 		genomes[i].species_id = 0
 		genomes[i].owner = self
 	
-	create_species(size)
+	create_species(species_counter, size, 0, [])
+	species_counter += 1
 
 
 #get a connection's innovation id given its input and output nodes
@@ -68,15 +69,13 @@ func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Di
 	}
 
 
-func create_species(length : int) -> Dictionary:
+func create_species(id : int, l : int, a : int, b : Array) -> Dictionary:
 	var s : Dictionary = {
-		'len' : length, #how many memeber there are
-		'age' : 0, #staleness
-		'best' : 0.0 #best fitness ever
+		'len' : l, #how many memeber there are
+		'age' : a, #staleness
+		'best' : [] #best genome ever (compressed)
 	}
-	species_data[species_counter] = s
-	species_counter += 1
-	
+	species_data[id] = s
 	return s
 
 
@@ -102,7 +101,8 @@ func speciate():
 		
 		if specimen.species_id == -1:
 			specimen.species_id = species_counter
-			create_species(1)
+			create_species(species_counter, 1, 0, [])
+			species_counter += 1
 		
 		var sid : int = specimen.species_id
 		new_species_len[sid] = 1
@@ -168,8 +168,8 @@ func reproduce():
 		var sd : Dictionary = species_data[sid]
 		var best_boi : NEATNN = genomes[gi]
 		
-		if best_boi.fitness > sd.best:
-			sd.best = best_boi.fitness
+		if best_boi.fitness > get_cg_fitness(sd.best):
+			sd.best = best_boi.get_compressed()
 			sd.age = 0
 		else:
 			sd.age += 1
@@ -229,9 +229,10 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 
 func reset(arr : Array):
 	arr.clear()
-	species_counter = 0
 	gen = 0
-	create_species(base_size)
+	species_data.clear()
+	create_species(0, base_size, 0, [])
+	species_counter = 1
 	for i in range(base_size):
 		var g : NEATNN = NEATNN.new(0,0).copy(base_genome)
 		mutate(g)
@@ -257,7 +258,6 @@ func mutate(nn : NEATNN):
 func gen_over():
 	gen += 1
 	emit_signal("gen_over")
-	reproduce()
 
 
 class MatingPool:
@@ -308,7 +308,7 @@ func print_data():
 	print(' Gen %s\nGENOMES: %s\n SPECIES (len=%s):' % [gen, genomes.size(), species_data.size()])
 	for k in species_data.keys():
 		var sd : Dictionary = species_data[k]
-		print('  [%s]\t len=%s\tage=%s\tbest=%s' % [k, sd.len, sd.age, sd.best])
+		print('  [%s]\t len=%s\tage=%s\tbest=%s' % [k, sd.len, sd.age, get_cg_fitness(sd.best)])
 
 
 func get_best_genome() -> NEATNN:
@@ -325,6 +325,10 @@ func get_best_genome() -> NEATNN:
 
 func get_genome(idx : int) -> NEATNN:
 	return genomes[idx]
+
+
+func get_cg_fitness(cg : Array) -> float:
+	return cg[3] if !cg.empty() else -1.0
 
 
 
@@ -345,3 +349,79 @@ func load_configs(path : String):
 		configs = NeatUtil.create_configfile()
 		save_configs(path)
 		printerr('Config file %s did not exist, please set it up and restart the program' % path)
+
+
+#SAVE & LOAD
+func save_json(path : String):
+	var f : File = File.new()
+	f.open(path, File.WRITE)
+	f.store_line(to_json(get_savedata()))
+	f.close()
+
+
+func load_json(path : String):
+	var f : File = File.new()
+	f.open(path, File.READ)
+	var d : Dictionary = parse_json(f.get_as_text())
+	f.close()
+	
+	load_savedata(d)
+
+
+func get_savedata() -> Dictionary:
+	var d := {
+		'bs' : base_size,
+		'bg' : base_genome.get_compressed(),
+		'sc' : species_counter,
+		'gen' : gen,
+		'ct' : compatibility_threshold,
+		'ci' : {},
+		's' : {}
+	}
+	
+	#connections innov
+	for c in connections_innovs.keys():
+		var b : int = ((c[0] & 0xFFFF) << 16) | (c[1] & 0xFFFF)
+		d.ci[b] = connections_innovs[c]
+	
+	#species
+	for sid in species_data.keys():
+		var sd : Dictionary = species_data[sid]
+		d.s[sid] = [
+			((sd.len & 0xFFFF) << 16) | (sd.age & 0xFFFF),
+			sd.best
+		]
+	return d
+
+
+func load_savedata(d : Dictionary):
+	base_size = d.bs
+	base_genome = NEATNN.new(0,0).load_compressed(d.bg)
+	species_counter = d.sc
+	gen = d.gen
+	compatibility_threshold = d.ct
+	
+	#connections innov
+	connections_innovs.clear()
+	for k in d.ci:
+		var n : int = int(k)
+		var i : PoolIntArray = PoolIntArray([ (n>>16)&0xFFFF , n&0xFFFF ])
+		connections_innovs[i] = d.ci[k]
+	
+	#species
+	species_data.clear()
+	genomes.clear()
+	for Ssid in d.s.keys():
+		var sid : int = int(Ssid)
+		var n : int = int(d.s[Ssid][0])
+		var l : int = (n >> 16) & 0xFFFF
+		var b : Array = d.s[Ssid][1]
+		create_species(sid, l, n & 0xFFFF, b)
+		
+		var bg : NEATNN = NEATNN.new(0,0).load_compressed(b)
+		genomes.append(bg)
+		for _i in range(l-1):
+			var g : NEATNN = NEATNN.new(0,0).copy(bg)
+			mutate(g)
+			genomes.append(g)
+

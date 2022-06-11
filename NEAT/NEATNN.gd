@@ -219,7 +219,7 @@ func mutate_enabled(enable : bool):
 func save_json(path : String):
 	var f : File = File.new()
 	f.open(path, File.WRITE)
-	f.store_line(to_json(get_save_data()))
+	f.store_line(to_json(get_compressed()))
 	f.close()
 
 
@@ -228,10 +228,10 @@ func load_json(path : String):
 	f.open(path, File.READ)
 	var d : Array = parse_json(f.get_as_text())
 	f.close()
-	load_save_data(d)
+	load_compressed(d)
 
 
-func get_save_data() -> Array:
+func get_compressed() -> Array:
 	var data : Array = [
 		INPUT_COUNT,
 		OUTPUT_COUNT,
@@ -245,7 +245,7 @@ func get_save_data() -> Array:
 	return data
 
 
-func load_save_data(d : Array):
+func load_compressed(d : Array):
 	INPUT_COUNT = int(d[0])
 	OUTPUT_COUNT = int(d[1])
 	resize_nodes(int(d[2]))
@@ -255,6 +255,7 @@ func load_save_data(d : Array):
 	connections.clear()
 	for i in range(5, d.size(), 3):
 		connections.append(NeatUtil.uncompress_connection(int(d[i]), int(d[i+1]), d[i+2]))
+	return self
 
 
 

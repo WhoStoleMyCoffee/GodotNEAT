@@ -2,10 +2,10 @@ extends Node2D
 
 
 const CONFIGPATH : String = 'res://Scenes/Pathfinding/configs.cfg'
-const SAVEPATH : String = 'res://Scenes/Pathfinding/nn.json'
+const SAVEPATH : String = 'res://Scenes/Pathfinding/saves/pop_%s.json'
 const AGENT = preload("res://Scenes/Pathfinding/Agent.tscn")
 
-const RUN_TIME : float = 3.0
+const RUN_TIME : float = 2.0
 
 onready var Displayer = $CanvasLayer/UI/NEATDisplayer
 
@@ -28,6 +28,7 @@ func _ready():
 	next_genome()
 	
 	$Timer.start(RUN_TIME)
+	pop.save_json(SAVEPATH % '0')
 
 
 func next_genome():
@@ -43,12 +44,16 @@ func _on_Timer_timeout():
 	$Timer.start(RUN_TIME)
 	
 	if di < pop.size():
+#		$Agent.evaluate()
 		next_genome()
 		return
 	
-	$Agent.evaluate()
+	
+	if pop.gen % 100 == 0:
+		pop.save_json(SAVEPATH % pop.gen)
 	
 	pop.gen_over()
+	pop.reproduce()
 	pop.print_data()
 	
 	di = 0

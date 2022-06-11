@@ -6,15 +6,15 @@ const TARGET_RADIUS : float = 32.0
 const RAYS_COUNT : int = 4
 const VIEWDIST = 512.0
 
-const TARGET_WEIGHT : float = 500.0
 const DIST_WEIGHT : float = 0.001
+const TARGET_WEIGHT : float = 500.0
 const COMPLETED_WEIGHT : float = 1000.0
-const COLLISION_WEIGHT : float = 0.95
+const COLLISION_WEIGHT : float = 0.02
 
 const spd : float = 100.0
 const friction : float = 0.9
 const refresh_rate : float = 0.1
-const EXTRA_TIME : float = 3.0
+const EXTRA_TIME : float = 2.0
 
 onready var timer : Timer = get_node('../Timer')
 
@@ -70,7 +70,7 @@ func _process(delta):
 	
 	vel = move_and_slide(vel) * friction
 	if is_on_wall():
-		brain.fitness *= COLLISION_WEIGHT
+		brain.fitness -= COLLISION_WEIGHT
 	
 	
 	
@@ -105,8 +105,9 @@ func think():
 	elif m == y[3]:	vel += Vector2.DOWN*spd
 
 
-func evaluate():
-	pass
+#func evaluate():
+#	pass
+#	print(brain.fitness)
 #	brain.fitness = (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT\
 #		+ targets_hit*TARGET_WEIGHT\
 #		+ int(completed)*COMPLETED_WEIGHT
