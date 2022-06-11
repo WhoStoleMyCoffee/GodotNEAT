@@ -124,6 +124,7 @@ func set_hidden_nodes_count(count : int):
 
 
 func resize_nodes(size : int):
+	genes[INDEX_SIZE] = size
 	if size < nodes.size():
 		nodes.resize(size)
 		return
@@ -194,6 +195,7 @@ func mutate_add_node():
 	#add next node
 	var next_node_id : int = nodes.size()
 	nodes.append(0.0)
+	genes[INDEX_SIZE] += 1
 	
 	#disable [in_node -> out_node]
 	set_c_enabled(bridge_con, false)
@@ -222,7 +224,14 @@ func load_json(path : String):
 	f.open(path, File.READ)
 	var d : Array = parse_json(f.get_as_text())
 	f.close()
-	genes = d
+	load_genes(d)
+
+
+func load_genes(_genes : Array):
+	genes = _genes.duplicate()
+	INPUT_COUNT = genes[INDEX_INPUTS]
+	OUTPUT_COUNT = genes[INDEX_OUTPUTS]
+	resize_nodes(INDEX_SIZE)
 
 
 

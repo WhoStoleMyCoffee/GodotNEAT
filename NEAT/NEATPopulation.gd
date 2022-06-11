@@ -60,20 +60,20 @@ func get_species_color(sid : int) -> Color:
 
 
 #unused?
-func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Dictionary:
-	return {
-		'i' : get_connection_innov(_in, _out),
-		'n' : PoolIntArray([_in, _out]),
-		'w' : _w,
-		'e' : _enabled
-	}
+func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Array:
+	var i : int = get_connection_innov(_in, _out)
+	return [
+		i * (int(_enabled)-int(!_enabled)), #i if enabled, -i if disabled
+		((_in&0xFFFF)<<16) | (_out&0xFFFF),
+		_w
+	]
 
 
 func create_species(id : int, l : int, a : int, b : Array) -> Dictionary:
 	var s : Dictionary = {
 		'len' : l, #how many memeber there are
 		'age' : a, #staleness
-		'best' : [] #best genome ever (compressed)
+		'best' : [] #best genome ever's genes
 	}
 	species_data[id] = s
 	return s
@@ -81,7 +81,7 @@ func create_species(id : int, l : int, a : int, b : Array) -> Dictionary:
 
 func reset_fitness():
 	for g in genomes:
-		g.fitness = 0.0
+		g.set_fitness(0.0)
 
 
 
@@ -104,7 +104,7 @@ func speciate():
 			create_species(species_counter, 1, 0, [])
 			species_counter += 1
 		
-		var sid : int = specimen.species_id
+		var sid : int = specimen.get_species_id()
 		new_species_len[sid] = 1
 		for j in range(genomes.size()-1, i, -1):
 			var g : NEATNN = genomes[j]
@@ -113,15 +113,15 @@ func speciate():
 			
 			#COMPARE GENOMES
 			if is_compatible(specimen, g):
-				g.species_id = sid
+				g.set_species_id(sid)
 				g.is_speciated = true
 				new_species_len[sid] += 1
 				continue
 			
 			#if same species but not compatible
 			#set its id to "hmm not sure" and move it to the end
-			if g.species_id == sid:
-				g.species_id = -1
+			if g.get_species_id() == sid:
+				g.set_species_id(-1)
 				genomes.remove(j)
 				genomes.append(g)
 		
@@ -148,15 +148,15 @@ func reproduce():
 	
 	#ADJUST FITNESS
 	for g in genomes:
-		var sid : int = g.species_id
-		var af : float = g.fitness / float(species_data[sid].len) #adjusted fitness
+		var sid : int = g.get_species_id()
+		var af : float = g.get_fitness() / float(species_data[sid].len) #adjusted fitness
 		afs[sid] = afs.get(sid, 0.0) + af
 		avg_global_adj_fitness += af
 		
 		#create pool while we're at it
 		if !pools.has(sid):
 			pools[sid] = MatingPool.new()
-		if pools[sid].data.size() < ceil(species_data[sid].len * survival_rate):
+		if pools[sid].data.size() < ceil(species_data[sid].len * survival_rate): #ignore worse genomes
 			pools[sid].add(g)
 	avg_global_adj_fitness /= float(size)
 	
@@ -168,8 +168,8 @@ func reproduce():
 		var sd : Dictionary = species_data[sid]
 		var best_boi : NEATNN = genomes[gi]
 		
-		if best_boi.fitness > get_cg_fitness(sd.best):
-			sd.best = best_boi.get_compressed()
+		if best_boi.get_fitness() > get_cg_fitness(sd.best):
+			sd.best = best_boi.genes.duplicate()
 			sd.age = 0
 		else:
 			sd.age += 1
@@ -217,7 +217,7 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 		#CROSS SPECIES BREEDING
 		if randf() < P_interspecies_breeding:
 			var rsp : int = species_data.keys()[randi()%species_data.size()]
-			p2 = pools[ rsp ].pick()
+			p2 = pools[rsp].pick()
 		
 		var child : NEATNN
 		if p2.fitness > p1.fitness:	child = NeatUtil.crossover(p2, p1)
@@ -236,7 +236,7 @@ func reset(arr : Array):
 	for i in range(base_size):
 		var g : NEATNN = NEATNN.new(0,0).copy(base_genome)
 		mutate(g)
-		g.species_id = 0
+		g.set_species_id(0)
 		g.owner = self
 		arr.append(g)
 
@@ -279,19 +279,19 @@ class MatingPool:
 
 
 func _compare_genomes(a, b):
-	if a.species_id != b.species_id:
-		return a.species_id < b.species_id
-	return a.fitness > b.fitness
+	if a.get_species_id() != b.get_species_id():
+		return a.get_species_id() < b.get_species_id()
+	return a.get_fitness() > b.get_fitness()
 
 func _compare_species(a, b):
-	return a.species_id < b.species_id
+	return a.get_species_id() < b.get_species_id()
 
 
 # UTIL ----------------------------------------------------------------------
 func add_genome() -> NEATNN:
 	var g : NEATNN = NEATNN.new(NN_INPUTS, NN_OUTPUTS)
 	genomes.append(g)
-	g.species_id = 0 if genomes.empty() else genomes[0].species_id
+	g.set_species_id(0 if genomes.empty() else genomes[0].get_species_id())
 	g.owner = self
 	size += 1
 	return g
@@ -311,6 +311,7 @@ func print_data():
 		print('  [%s]\t len=%s\tage=%s\tbest=%s' % [k, sd.len, sd.age, get_cg_fitness(sd.best)])
 
 
+#unused?
 func get_best_genome() -> NEATNN:
 	var best_f : float = -1.0
 	var best_g : NEATNN
@@ -327,8 +328,10 @@ func get_genome(idx : int) -> NEATNN:
 	return genomes[idx]
 
 
+#get a genome's fitness considering cg can be an empty array
+# cg : the genome's genes
 func get_cg_fitness(cg : Array) -> float:
-	return cg[3] if !cg.empty() else -1.0
+	return cg[NEATNN.INDEX_FITNESS] if !cg.empty() else -1.0
 
 
 
@@ -418,7 +421,7 @@ func load_savedata(d : Dictionary):
 		var b : Array = d.s[Ssid][1]
 		create_species(sid, l, n & 0xFFFF, b)
 		
-		var bg : NEATNN = NEATNN.new(0,0).load_compressed(b)
+		var bg : NEATNN = NEATNN.new(0,0).load_genes(b)
 		genomes.append(bg)
 		for _i in range(l-1):
 			var g : NEATNN = NEATNN.new(0,0).copy(bg)
