@@ -44,18 +44,18 @@ func _draw():
 	
 	
 #	DRAW CONNECTIONS
-	for c in NN.connections:
+	for c in range(NEATNN.INDEX_CONNECTIONS, NN.genes.size(), NEATNN.C_LEN):
 		#skip disabled
-		if !c.e: continue
+		if !NN.is_c_enabled(c): continue
 		
-		var in_pos : Vector2 = node_positions_cache[c.n[0]]
-		var out_pos : Vector2 = node_positions_cache[c.n[1]]
+		var in_pos : Vector2 = node_positions_cache[NN.get_c_in(c)]
+		var out_pos : Vector2 = node_positions_cache[NN.get_c_out(c)]
 		
-		var col = connection_negative_color if c.w < 0 else connection_positive_color
-		if NN.is_node_input(c.n[1]): #recurrent connection
+		var col = connection_negative_color if NN.get_c_w(c) < 0 else connection_positive_color
+		if NN.is_node_input(NN.get_c_out(c)): #recurrent connection
 			col = recurrent_connection_color
 		
-		draw_line(in_pos, out_pos, col, max(connection_width*abs(c.w), min_connection_width))
+		draw_line(in_pos, out_pos, col, max(connection_width*abs(NN.get_c_w(c)), min_connection_width))
 	
 	
 #	DRAW NODES
@@ -97,14 +97,14 @@ func cache_node_positions():
 			var maxx : float = 0
 			var maxy : float = 0
 			
-			for c in NN.connections:
-				if !c.e: continue
+			for c in range(NEATNN.INDEX_CONNECTIONS, NN.genes.size(), NEATNN.C_LEN):
+				if !NN.is_c_enabled(c): continue
 				var nidx : int
 				
 				#check incoming connections
-				if c.n[1] == i:	nidx = c.n[0]
+				if NN.get_c_out(c) == i:	nidx = NN.get_c_in(c)
 				#check outgoing connections
-				elif c.n[0] == i:	nidx = c.n[1]
+				elif NN.get_c_in(c) == i:	nidx = NN.get_c_out(c)
 				#connection has nothing to do with this node so skip it
 				else: continue
 				
