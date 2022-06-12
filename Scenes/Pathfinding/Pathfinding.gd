@@ -30,6 +30,14 @@ func _ready():
 	$Timer.start(RUN_TIME)
 	pop.save_json(SAVEPATH % '0')
 
+"""
+-4.522
+
+var spb = StreamPeerBuffer.new()
+spb.put_float(-4.522)
+spb.data_array
+"""
+
 
 func next_genome():
 	update_info()

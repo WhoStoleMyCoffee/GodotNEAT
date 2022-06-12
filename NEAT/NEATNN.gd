@@ -75,16 +75,23 @@ func feed_forward(X : Array) -> Array:
 func add_connection(c : Array) -> void:
 	resize_nodes(max(nodes.size(), max((c[INDEX_NODES]>>16)&0xFFFF, c[INDEX_NODES]&0xFFFF)+1))
 	var i : int = search_connection(abs(c[INDEX_INNOV]))
-	genes.insert(i, c[0])
-	genes.insert(i+1, c[1])
-	genes.insert(i+2, c[2])
+	
+	c.append_array( genes.slice(i+1, genes.size()) )
+	genes = genes.slice(0, i)
+	genes.append_array(c)
+	
+	#old way:
+	# caused some weird ass fucking bugs i have no idea whats wrong with this method...
+#	genes.insert(i, int(c[0]))
+#	genes.insert(i+1, int(c[1]))
+#	genes.insert(i+2, float(c[2]))
 
 
 func create_connection(_in : int, _out : int, _w : float, _enabled : bool) -> Array:
 	var i : int = owner.get_connection_innov(_in, _out) if owner else get_connections_count()
 	return [
 		i * (int(_enabled)-int(!_enabled)), #i if enabled, -i if disabled
-		((_in&0xFFFF)<<16) | (_out&0xFFFF),
+		int( ((_in&0xFFFF)<<16) | (_out&0xFFFF) ),
 		_w
 	]
 

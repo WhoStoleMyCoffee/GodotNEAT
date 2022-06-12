@@ -9,7 +9,7 @@ export(float) var node_radius = 8.0
 export(Color) var connection_positive_color = Color.blue
 export(Color) var connection_negative_color = Color.red
 export(float) var connection_width = 2.0
-export(float) var min_connection_width = 2.0
+export(float) var max_connection_width = 10.0
 export(Color) var recurrent_connection_color = Color.white
 export(bool) var do_draw_node_id = false
 export(Color) var font_color = Color.black
@@ -18,7 +18,6 @@ export(float) var padding = 48.0
 onready var font : Font = Control.new().get_font('font')
 
 var NN setget set_drawing_nn
-var node_positions_cache := []
 
 
 func _ready():
@@ -28,63 +27,23 @@ func _ready():
 func set_drawing_nn(_nn):
 	NN = _nn
 	if !visible: return
-	cache_node_positions()
 	update()
 
 
 func _draw():
 	if NN == null: return
 	
-	#outline rect
-	draw_rect(Rect2(0, 0, size.x, size.y), NN.get_color(), false)
-	
-	#re-cache
-	if node_positions_cache.size() != NN.nodes.size():
-		cache_node_positions()
-	
-	
-#	DRAW CONNECTIONS
-	for c in range(NEATNN.INDEX_CONNECTIONS, NN.genes.size(), NEATNN.C_LEN):
-		#skip disabled
-		if !NN.is_c_enabled(c): continue
-		
-		var in_pos : Vector2 = node_positions_cache[NN.get_c_in(c)]
-		var out_pos : Vector2 = node_positions_cache[NN.get_c_out(c)]
-		
-		var col = connection_negative_color if NN.get_c_w(c) < 0 else connection_positive_color
-		if NN.is_node_input(NN.get_c_out(c)): #recurrent connection
-			col = recurrent_connection_color
-		
-		draw_line(in_pos, out_pos, col, max(connection_width*abs(NN.get_c_w(c)), min_connection_width))
-	
-	
-#	DRAW NODES
-	for i in range(NN.nodes.size()):
-		var p : Vector2 = node_positions_cache[i]
-		draw_circle(p, node_radius, node_color)
-		
-		if do_draw_node_id:
-			draw_string(font, p + Vector2(-4, 4), str(i), font_color)
-
-
-func cache_node_positions():
-	#we do clear() because we want every element to be null
-	node_positions_cache.clear()
-	node_positions_cache.resize(NN.nodes.size())
-	
+	var node_positions : PoolVector2Array = PoolVector2Array()
+	node_positions.resize(NN.nodes.size())
 	#loop input and output nodes
 	for i in range(NN.INPUT_COUNT+NN.OUTPUT_COUNT):
 		#idk what half of these numbers are but it works
 		if NN.is_node_input(i): #INPUT NODE
-			node_positions_cache[i] = Vector2(
-				0,
-				(size.y / (NN.INPUT_COUNT+1)) * (i+1)
-			)
+			node_positions[i] = Vector2( 0,
+				(size.y/(NN.INPUT_COUNT+1))*(i+1) )
 		elif NN.is_node_output(i): #OUTPUT NODE
-			node_positions_cache[i] = Vector2(
-				size.x,
-				(size.y / (NN.OUTPUT_COUNT+1)) * (i - NN.INPUT_COUNT+1)
-			)
+			node_positions[i] = Vector2( size.x,
+				(size.y/(NN.OUTPUT_COUNT+1))*(i-NN.INPUT_COUNT+1))
 	
 	#we loop _k to make sure everything is nice and centered
 	for _k in range(2):
@@ -109,19 +68,50 @@ func cache_node_positions():
 				else: continue
 				
 				#check to make sure nidx is cached
-				if node_positions_cache[nidx] == null:
+				if node_positions.size() >= nidx:
 					continue
 				
-				var p = node_positions_cache[nidx]
+				var p : Vector2 = node_positions[nidx]
 				minx = min(minx, p.x)
 				miny = min(miny, p.y)
 				maxx = max(maxx, p.x)
 				maxy = max(maxy, p.y)
 			
-			node_positions_cache[i] = Vector2(
+			node_positions[i] = Vector2(
 				clamp((minx+maxx)*0.5, padding, size.x-padding),
 				clamp((miny+maxy)*0.5 + 10, padding, size.y-padding)
 			)
+	
+	
+	#outline rect
+	draw_rect(Rect2(0, 0, size.x, size.y), NN.get_color(), false)
+	
+#	DRAW CONNECTIONS
+	for c in range(NEATNN.INDEX_CONNECTIONS, NN.genes.size(), NEATNN.C_LEN):
+		#skip disabled
+		if !NN.is_c_enabled(c): continue
+		
+		if NN.genes[c+1] < 0:
+			print('aaaah')
+		
+		var in_pos : Vector2 = node_positions[NN.get_c_in(c)]
+		var out_pos : Vector2 = node_positions[NN.get_c_out(c)]
+		
+		var col = connection_negative_color if NN.get_c_w(c) < 0 else connection_positive_color
+		if NN.is_node_input(NN.get_c_out(c)): #recurrent connection
+			col = recurrent_connection_color
+		
+		var w : float = clamp(connection_width*abs(NN.get_c_w(c)), 1.0, max_connection_width)
+		draw_line(in_pos, out_pos, col, w)
+	
+	
+#	DRAW NODES
+	for i in range(NN.nodes.size()):
+		var p : Vector2 = node_positions[i]
+		draw_circle(p, node_radius, node_color)
+		
+		if do_draw_node_id:
+			draw_string(font, p + Vector2(-4, 4), str(i), font_color)
 
 
 
@@ -133,5 +123,4 @@ func set_bounds(v : Vector2):
 
 func _on_visibility_changed():
 	if visible:
-		cache_node_positions()
 		update()

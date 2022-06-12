@@ -39,7 +39,6 @@ func crossover(p1, p2):
 		return offspring
 	
 	for c2 in range(NEATNN.INDEX_CONNECTIONS, p2.genes.size(), NEATNN.C_LEN):
-		
 		var c2i : int = p2.get_c_innov(c2)
 		
 		#EXCESS GENES (skip the rest of the worse parent)
@@ -62,6 +61,10 @@ func crossover(p1, p2):
 			offspring.set_c_enabled(co, false)
 	
 	offspring.resize_nodes( max(p1.nodes.size(), p2.nodes.size()) )
+#	var max_n : int = p1.INPUT_COUNT+p1.OUTPUT_COUNT
+#	for c in range(NEATNN.INDEX_CONNECTIONS, offspring.genes.size(), NEATNN.C_LEN):
+#		max_n = max(max_n, max(offspring.get_c_in(c), offspring.get_c_out(c)))
+#	offspring.resize_nodes(max_n+1)
 	return offspring
 
 
