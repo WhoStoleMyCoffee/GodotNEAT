@@ -44,7 +44,6 @@ func _on_Timer_timeout():
 	$Timer.start(RUN_TIME)
 	
 	if di < pop.size():
-#		$Agent.evaluate()
 		next_genome()
 		return
 	
@@ -61,4 +60,4 @@ func _on_Timer_timeout():
 
 
 func update_info():
-	$CanvasLayer/UI/Info.bbcode_text = 'Gen %s  genome %s\n Species %s' % [pop.gen, di, pop.get_genome(di).species_id]
+	$CanvasLayer/UI/Info.bbcode_text = 'Gen %s  genome %s\n Species %s' % [pop.gen, di, pop.get_genome(di).get_species_id()]

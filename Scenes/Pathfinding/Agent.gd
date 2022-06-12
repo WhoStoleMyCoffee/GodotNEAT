@@ -48,7 +48,7 @@ func _ready():
 
 func set_brain(nn : NEATNN):
 	brain = nn
-	brain.fitness = 0.0
+	brain.set_fitness(0.0)
 	modulate = brain.get_color()
 
 
@@ -66,21 +66,22 @@ func _process(delta):
 		return
 	
 	
-	brain.fitness += (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT
+	var f : float = (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT
+	brain.add_fitness(f)
 	
 	vel = move_and_slide(vel) * friction
 	if is_on_wall():
-		brain.fitness -= COLLISION_WEIGHT
+		brain.add_fitness(-COLLISION_WEIGHT)
 	
 	
 	
 	if position.distance_squared_to(current_target.position) < TARGET_RADIUS*TARGET_RADIUS:
 		if targets_hit == TARGET_COUNT-1:
-			brain.fitness += COMPLETED_WEIGHT
+			brain.add_fitness(COMPLETED_WEIGHT)
 			completed = true
 			return
 
-		brain.fitness += TARGET_WEIGHT
+		brain.add_fitness(TARGET_WEIGHT)
 		targets_hit += 1
 		current_target = get_node('../Targets/t%s' % targets_hit)
 		
@@ -103,14 +104,6 @@ func think():
 	elif m == y[1]:	vel += Vector2.RIGHT*spd
 	elif m == y[2]:	vel += Vector2.UP*spd
 	elif m == y[3]:	vel += Vector2.DOWN*spd
-
-
-#func evaluate():
-#	pass
-#	print(brain.fitness)
-#	brain.fitness = (1024.0-position.distance_to(current_target.position))*DIST_WEIGHT\
-#		+ targets_hit*TARGET_WEIGHT\
-#		+ int(completed)*COMPLETED_WEIGHT
 
 
 func get_inputs() -> Array:

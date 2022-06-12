@@ -32,7 +32,7 @@ func _init(base_g : NEATNN, config_path : String):
 	
 	for i in range(size):
 		genomes.append(NEATNN.new(0,0).copy(base_genome))
-		genomes[i].species_id = 0
+		genomes[i].set_species_id(0)
 		genomes[i].owner = self
 	
 	create_species(species_counter, size, 0, [])
@@ -99,8 +99,8 @@ func speciate():
 		if specimen.is_speciated:
 			continue
 		
-		if specimen.species_id == -1:
-			specimen.species_id = species_counter
+		if specimen.get_species_id() == -1:
+			specimen.set_species_id(species_counter)
 			create_species(species_counter, 1, 0, [])
 			species_counter += 1
 		
@@ -220,8 +220,9 @@ func _reproduce_species(sid : int, count : int, pools : Dictionary, new_genomes 
 			p2 = pools[rsp].pick()
 		
 		var child : NEATNN
-		if p2.fitness > p1.fitness:	child = NeatUtil.crossover(p2, p1)
-		else:						child = NeatUtil.crossover(p1, p2)
+		if p2.get_fitness() > p1.get_fitness():
+			  child = NeatUtil.crossover(p2, p1)
+		else: child = NeatUtil.crossover(p1, p2)
 		child.owner = self
 		mutate(child)
 		new_genomes.append(child)
@@ -265,8 +266,8 @@ class MatingPool:
 	var t : float = 0.0
 	
 	func add(k : NEATNN):
-		data[k] = k.fitness
-		t += k.fitness
+		data[k] = k.get_fitness()
+		t += k.get_fitness()
 	
 	func pick() -> NEATNN:
 		var v : float = randf()*t
@@ -317,8 +318,8 @@ func get_best_genome() -> NEATNN:
 	var best_g : NEATNN
 	
 	for g in genomes:
-		if g.fitness > best_f:
-			best_f = g.fitness
+		if g.get_fitness() > best_f:
+			best_f = g.get_fitness()
 			best_g = g
 	
 	return best_g
@@ -374,7 +375,7 @@ func load_json(path : String):
 func get_savedata() -> Dictionary:
 	var d := {
 		'bs' : base_size,
-		'bg' : base_genome.get_compressed(),
+		'bg' : base_genome.genes,
 		'sc' : species_counter,
 		'gen' : gen,
 		'ct' : compatibility_threshold,

@@ -148,7 +148,7 @@ func mutate(configs : ConfigFile):
 			configs.get_value('mutation', 'P_weight_pertub', 0.95),
 			configs.get_value('mutation', 'weight_amt', 2.5))
 	if randf() < configs.get_value('mutation', 'P_connection', 0.05):
-		mutate_add_connection( configs.get_value('mutation', 'allow_recurrent', true) )
+		mutate_add_connection( configs.get_value('mutation', 'P_recurrent', 0.0) )
 	if randf() < configs.get_value('mutation', 'P_node', 0.01):
 		mutate_add_node()
 	if randf() < configs.get_value('mutation', 'P_enable', 0.01):
@@ -164,9 +164,9 @@ func mutate_weights(per_weight_chance : float, pertub_chance : float, amt : floa
 
 
 #add a connection going from in_node to out_node
-func mutate_add_connection(allow_recurrent : bool):
+func mutate_add_connection(P_recurrent : float):
 	var in_node : int = randi() % nodes.size()
-	var out_node : int = floor(rand_range(INPUT_COUNT, nodes.size())) if !allow_recurrent else randi() % nodes.size()
+	var out_node : int = (randi()%INPUT_COUNT) if randf() < P_recurrent else floor(rand_range(INPUT_COUNT, nodes.size()))
 	
 	if in_node == out_node:
 		return
@@ -242,6 +242,9 @@ func get_fitness() -> float:
 func set_fitness(v : float):
 	genes[INDEX_FITNESS] = v
 
+func add_fitness(v : float):
+	genes[INDEX_FITNESS] += v
+
 func get_species_id() -> int:
 	return genes[INDEX_SPECIES]
 
@@ -285,7 +288,7 @@ func get_c_out(i : int) -> int:
 	return int(genes[i+INDEX_NODES])&0xFFFF
 
 func get_c_w(i : int) -> float:
-	return genes[i+INDEX_WEIGHT]
+	return float(genes[i+INDEX_WEIGHT])
 
 func get_c_innov(i : int) -> int:
 	return int(abs(genes[i]))

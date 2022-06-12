@@ -10,7 +10,7 @@ func create_configfile() -> ConfigFile:
 	cf.set_value('mutation', 'P_weight_pertub', 0.95)
 	cf.set_value('mutation', 'weight_amt', 2.5)
 	cf.set_value('mutation', 'P_connection', 0.05)
-	cf.set_value('mutation', 'allow_recurrent', true)
+	cf.set_value('mutation', 'P_recurrent', 0.0)
 	cf.set_value('mutation', 'P_node', 0.01)
 	cf.set_value('mutation', 'P_enable', 0.01)
 	cf.set_value('mutation', 'P_disable', 0.01)
